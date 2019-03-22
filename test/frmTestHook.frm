@@ -23,7 +23,6 @@ Private Const WH_CALLWNDPROC                As Long = 4
 Private Const HC_ACTION                     As Long = 0
 
 Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (lpvDest As Any, lpvSource As Any, ByVal cbCopy As Long)
-Private Declare Function DefSubclassProc Lib "comctl32" Alias "#413" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
 
 Private Type CWPSTRUCT
     lParam              As Long
@@ -32,47 +31,47 @@ Private Type CWPSTRUCT
     hWnd                As Long
 End Type
 
-Private m_pHookThunk            As IUnknown
-Private m_pSubclassThunk        As IUnknown
+Private m_pHook                 As IUnknown
+Private m_pSubclass             As IUnknown
 Private WithEvents m_oList      As VB.ListBox
 Attribute m_oList.VB_VarHelpID = -1
 
-Private Property Get AddressOfHookProc() As frmTestHook
-    Set AddressOfHookProc = InitAddressOfMethod(Me, 3)
+Private Property Get pvAddressOfHookProc() As frmTestHook
+    Set pvAddressOfHookProc = InitAddressOfMethod(Me, 3)
 End Property
 
-Private Property Get AddressOfWndProc() As frmTestHook
-    Set AddressOfWndProc = InitAddressOfMethod(Me, 4)
+Private Property Get pvAddressOfSubclassProc() As frmTestHook
+    Set pvAddressOfSubclassProc = InitAddressOfMethod(Me, 4)
 End Property
 
 Private Sub Form_Click()
-    Set m_pHookThunk = Nothing
+    Set m_pHook = Nothing
 End Sub
 
 Private Sub Form_Load()
-    Set m_pHookThunk = InitHookingThunk(WH_CALLWNDPROC, Me, AddressOfHookProc.HookProc(0, 0, 0))
+    Set m_pHook = InitHookingThunk(WH_CALLWNDPROC, Me, pvAddressOfHookProc.CallWndProcHookProc(0, 0, 0))
     Set m_oList = Controls.Add("VB.ListBox", "lst")
     Debug.Print "m_oList.hWnd=" & m_oList.hWnd, Timer
 End Sub
 
-Public Function HookProc(ByVal nCode As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+Public Function CallWndProcHookProc(ByVal nCode As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
     Dim cwp             As CWPSTRUCT
     
     If nCode = HC_ACTION Then
         Call CopyMemory(cwp, ByVal lParam, Len(cwp))
         If cwp.lMessage = WM_CREATE Then
             Debug.Print "cwp.hWnd=" & cwp.hWnd, Timer
-            Set m_pSubclassThunk = InitSubclassingThunk(cwp.hWnd, Me, AddressOfWndProc.ListWndProc(0, 0, 0, 0))
+            Set m_pSubclass = InitSubclassingThunk(cwp.hWnd, Me, pvAddressOfSubclassProc.ListSubclassProc(0, 0, 0, 0))
         End If
     End If
-    HookProc = CallNextHookProc(m_pHookThunk, nCode, wParam, lParam)
+    CallWndProcHookProc = CallNextHookProc(m_pHook, nCode, wParam, lParam)
 End Function
 
-Public Function ListWndProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+Public Function ListSubclassProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
     If wMsg = WM_CREATE Then
-        Debug.Print "wMsg=" & wMsg & " (WM_CREATE)", Timer
+        Debug.Print "hWnd=" & hWnd & ", wMsg=" & wMsg & " (WM_CREATE)", Timer
     Else
-        Debug.Print "wMsg=" & wMsg, Timer
+        Debug.Print "hWnd=" & hWnd & ", wMsg=" & wMsg, Timer
     End If
-    ListWndProc = DefSubclassProc(hWnd, wParam, wParam, lParam)
+    ListSubclassProc = CallNextSubclassProc(m_pSubclass, hWnd, wParam, wParam, lParam)
 End Function

@@ -32,24 +32,24 @@ Option Explicit
 
 Private m_pTimer As IUnknown
 
-Private Property Get AddressOfTimerProc() As frmTestTimers
-    Set AddressOfTimerProc = InitAddressOfMethod(Me, 0)
+Private Property Get pvAddressOfTimerProc() As frmTestTimers
+    Set pvAddressOfTimerProc = InitAddressOfMethod(Me, 0)
 End Property
 
 Private Sub Command1_Click()
     Debug.Print "here"
-    Set m_pTimer = InitFireOnceTimerThunk(Me, AddressOfTimerProc.TimerProc(), Delay:=1000)
+    Set m_pTimer = InitFireOnceTimerThunk(Me, pvAddressOfTimerProc.TimerProc(), Delay:=1000)
 End Sub
 
 Private Sub Form_Load()
 '    Dim o As Object
-    Set m_pTimer = InitFireOnceTimerThunk(Me, AddressOfTimerProc.TimerProc(), Delay:=100)
+    Set m_pTimer = InitFireOnceTimerThunk(Me, pvAddressOfTimerProc.TimerProc(), Delay:=100)
 '    Set o = m_pTimer
 End Sub
 
 Public Function TimerProc() As Long
     Debug.Print "TimerProc, App.NonModalAllowed=" & App.NonModalAllowed, Timer
-'    Set m_pTimer = InitFireOnceTimerThunk(Me, AddressOfTimerProc.TimerProc(), Delay:=100)
+'    Set m_pTimer = InitFireOnceTimerThunk(Me, pvAddressOfTimerProc.TimerProc(), Delay:=100)
     Set m_pTimer = Nothing
 End Function
 
