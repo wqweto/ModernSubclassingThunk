@@ -786,7 +786,7 @@ __call_callback:
         pop     eax                             // RetVal
         jmp     __exit_HookProc
 __skip_callback:
-        // invoke CallNextHookEx(this->hIdeOwner, GWL_STYLE)
+        // invoke CallNextHookEx(hHook, nCode, wParam, lParam)
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    dword ptr [ebp+20]              // param lParam
         push    dword ptr [ebp+16]              // param wParam
