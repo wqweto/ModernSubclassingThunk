@@ -55,6 +55,7 @@ Private Sub Form_Load()
 End Sub
 
 Public Function CallWndProcHookProc(ByVal nCode As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+Attribute CallWndProcHookProc.VB_MemberFlags = "40"
     Dim cwp             As CWPSTRUCT
     
     If nCode = HC_ACTION Then
@@ -68,6 +69,7 @@ Public Function CallWndProcHookProc(ByVal nCode As Long, ByVal wParam As Long, B
 End Function
 
 Public Function ListSubclassProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+Attribute ListSubclassProc.VB_MemberFlags = "40"
     If wMsg = WM_CREATE Then
         Debug.Print "hWnd=" & hWnd & ", wMsg=" & wMsg & " (WM_CREATE)", Timer
     Else

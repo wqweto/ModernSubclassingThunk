@@ -73,6 +73,7 @@ Private m_sngMinHeight      As Single
 '=========================================================================
 
 Public Function SubclassProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+Attribute SubclassProc.VB_MemberFlags = "40"
     Dim uInfo           As MINMAXINFO
     
     Select Case wMsg

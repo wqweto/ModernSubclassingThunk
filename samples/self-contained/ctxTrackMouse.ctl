@@ -92,6 +92,7 @@ Private Sub pvUnsubclass()
 End Sub
 
 Public Function SubclassProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+Attribute SubclassProc.VB_MemberFlags = "40"
     Select Case wMsg
     Case WM_MOUSELEAVE, WM_CANCELMODE
         If IsHot Then
