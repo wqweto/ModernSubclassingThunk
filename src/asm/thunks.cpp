@@ -1,3 +1,13 @@
+//=========================================================================
+//
+// MST Project (c) 2019 by wqweto@gmail.com
+//
+// The Modern Subclassing Thunk (MST) for VB6
+//
+// This project is licensed under the terms of the MIT license
+// See the LICENSE file in the project root for more information
+//
+//=========================================================================
 #include <stdio.h>
 #include <windows.h>
 #include <commctrl.h>
