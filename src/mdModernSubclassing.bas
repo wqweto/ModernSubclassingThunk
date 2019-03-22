@@ -55,14 +55,14 @@ Public Function InitAddressOfMethod(pObj As Object, ByVal MethodParamCount As Lo
     Debug.Assert lSize = THUNK_SIZE
 End Function
 
-Public Function InitSubclassingThunk(ByVal hWnd As Long, ByVal lThisPtr As Long, ByVal pfnCallback As Long) As IUnknown
+Public Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal pfnCallback As Long) As IUnknown
     Const STR_THUNK     As String = "6AAAAABag+oFgepwENQAV1aLdCQUg8YIgz4AdC+L+oHH4BHUAIvCBQQR1ACri8IFQBHUAKuLwgVQEdQAq4vCBXwR1ACruQkAAADzpYHC4BHUAFJqFP9SEFqL+IvCq7gBAAAAq4tEJAyri3QkFKWlg+8UagBX/3IM/3cI/1IYi0QkGIk4Xl+4FBLUAC1wENQAwhAAkItEJAiDOAB1KoN4BAB1JIF4CMAAAAB1G4F4DAAAAEZ1EotUJAT/QgSLRCQMiRAzwMIMALgCQACAwgwAkItUJAT/QgSLQgTCBAAPHwCLVCQE/0oEi0IEg/gAfxiLClL/cQz/cgj/URyLVCQEiwpS/1EUM8DCBABmkFWL7ItVGIsKi0EshcB0J1L/0FqD+AF1N4sKUv9RMFqFwHUsiwpSavD/cST/UShaqQAAAAh1GTPAUFT/dRT/dRD/dQz/dQj/cgz/UhBY6xGLCv91FP91EP91DP91CP9RIF3CGAA=" ' 22.3.2019 10:17:35
     Const THUNK_SIZE    As Long = 420
     Static hThunk       As Long
     Dim aParams(0 To 10) As Long
     Dim lSize           As Long
     
-    aParams(0) = lThisPtr
+    aParams(0) = ObjPtr(pObj)
     aParams(1) = pfnCallback
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
@@ -92,14 +92,14 @@ Public Function CallNextSubclassProc(pSubclass As IUnknown, ByVal hWnd As Long, 
     CallNextSubclassProc = DefSubclassProc(hWnd, wMsg, wParam, lParam)
 End Function
 
-Public Function InitHookingThunk(ByVal idHook As Long, ByVal lThisPtr As Long, ByVal pfnCallback As Long) As IUnknown
+Public Function InitHookingThunk(ByVal idHook As Long, pObj As Object, ByVal pfnCallback As Long) As IUnknown
     Const STR_THUNK     As String = "6AAAAABag+oFgepwEIsAV1aLdCQUg8YIgz4AdCqL+oHHLBKLAIvCBVQRiwCri8IFkBGLAKuLwgWgEYsAqzPAq7kJAAAA86WBwiwSiwBSahT/UhBai/iLwqu4AQAAAKszwKuLdCQUpaWD7xSLSgz/QgyBYgz/AAAAjQTKjQTIjUyINMcB/zQkuIl5BMdBCIlEJASLwi0sEosABcgRiwBQweAIBbgAAACJQQxYwegYBQD/4JCJQRD/dCQQagBR/3QkGIsP/1EYiUcIi0QkGIk4Xl+4YBKLAC1wEIsABQAUAADCEACQi0QkCIM4AHUqg3gEAHUkgXgIwAAAAHUbgXgMAAAARnUSi1QkBP9CBItEJAyJEDPAwgwAuAJAAIDCDACQi1QkBP9CBItCBMIEAA8fAItUJAT/SgSLQgSD+AB/FIsK/3II/1Eci1QkBIsKUv9RFDPAwgQAZpBVi+yLVQiLCotBLIXAdCdS/9Bag/gBdTSLClL/UTBahcB1KYsKUmrw/3Ek/1EoWqkAAAAIdRYzwFBU/3UU/3UQ/3UM/3IM/1IQWOsRiwr/dRT/dRD/dQz/cgj/USBdwhAADx8A" ' 22.3.2019 10:18:11
     Const THUNK_SIZE    As Long = 5616
     Static hThunk       As Long
     Dim aParams(0 To 10) As Long
     Dim lSize           As Long
     
-    aParams(0) = lThisPtr
+    aParams(0) = ObjPtr(pObj)
     aParams(1) = pfnCallback
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
@@ -132,14 +132,14 @@ Public Function CallNextHookProc(pHook As IUnknown, ByVal nCode As Long, ByVal w
     CallNextHookProc = CallNextHookEx(lPtr, nCode, wParam, lParam)
 End Function
 
-Public Function InitFireOnceTimerThunk(ByVal lThisPtr As Long, ByVal pfnCallback As Long, Optional Delay As Long) As IUnknown
+Public Function InitFireOnceTimerThunk(pObj As Object, ByVal pfnCallback As Long, Optional Delay As Long) As IUnknown
     Const STR_THUNK     As String = "6AAAAABag+oFgeogEYkAV1aLdCQUg8YIgz4AdCqL+oHH3BKJAIvCBQQSiQCri8IFQBKJAKuLwgVQEokAqzPAq7kIAAAA86WBwtwSiQBSahT/UhBai/iLwqu4AQAAAKszwKuLdCQUpaWD7xSLSgz/QgyBYgz/AAAAjQTKjQTIjUyIMMcB/zQkuIl5BMdBCIlEJASLwi3cEokABXgSiQBQweAIBbgAAACJQQxYwegYBQD/4JCJQRBR/3QkFGoAagCLD/9RGIlHCItEJBiJOF5fuAwTiQAtIBGJAAUAFAAAwhAADx8Ai0QkCIM4AHUqg3gEAHUkgXgIwAAAAHUbgXgMAAAARnUSi1QkBP9CBItEJAyJEDPAwgwAuAJAAIDCDACQi1QkBP9CBItCBMIEAA8fAItUJAT/SgSLQgSD+AB/FosK/3IIagD/URyLVCQEiwpS/1EUM8DCBACLVCQEiwqLQSiFwHQzUv/QWoP4AXVJiwpS/1EsWoXAdT6LClJq8P9xIP9RJFqpAAAACHUriwpS/3IIagD/URxa/0IEM8BQVP9yDP9SEItUJAjHQggAAAAAUuh6////WMIUAGaQ" ' 22.3.2019 10:18:57
     Const THUNK_SIZE    As Long = 5612
     Static hThunk       As Long
     Dim aParams(0 To 9) As Long
     Dim lSize           As Long
     
-    aParams(0) = lThisPtr
+    aParams(0) = ObjPtr(pObj)
     aParams(1) = pfnCallback
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)

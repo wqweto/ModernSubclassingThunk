@@ -65,9 +65,9 @@ End Property
 
 Private Sub Form_Load()
 '    Dim o As Object
-    Set m_pSubclass2 = InitSubclassingThunk(hWnd, ObjPtr(Me), AddressOf RedirectFrmTestSubclassWndProc)
-    Set m_pSubclass1 = InitSubclassingThunk(hWnd, ObjPtr(Me), pvAddressOfSubclassProc.SubclassProc(0, 0, 0, 0))
-'    Set m_pSubclass2 = InitSubclassingThunk(hWnd, ObjPtr(Me), pvAddressOfSubclassProc.frWndProc(0, 0, 0, 0))
+    Set m_pSubclass2 = InitSubclassingThunk(hWnd, Me, AddressOf RedirectFrmTestSubclassWndProc)
+    Set m_pSubclass1 = InitSubclassingThunk(hWnd, Me, pvAddressOfSubclassProc.SubclassProc(0, 0, 0, 0))
+'    Set m_pSubclass2 = InitSubclassingThunk(hWnd, Me, pvAddressOfSubclassProc.frWndProc(0, 0, 0, 0))
 '    Set o = m_pSubclass1
 End Sub
 

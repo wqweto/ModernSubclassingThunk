@@ -50,7 +50,7 @@ Private Sub Form_Click()
 End Sub
 
 Private Sub Form_Load()
-    Set m_pHookThunk = InitHookingThunk(WH_CALLWNDPROC, ObjPtr(Me), AddressOfHookProc.HookProc(0, 0, 0))
+    Set m_pHookThunk = InitHookingThunk(WH_CALLWNDPROC, Me, AddressOfHookProc.HookProc(0, 0, 0))
     Set m_oList = Controls.Add("VB.ListBox", "lst")
     Debug.Print "m_oList.hWnd=" & m_oList.hWnd, Timer
 End Sub
@@ -62,7 +62,7 @@ Public Function HookProc(ByVal nCode As Long, ByVal wParam As Long, ByVal lParam
         Call CopyMemory(cwp, ByVal lParam, Len(cwp))
         If cwp.lMessage = WM_CREATE Then
             Debug.Print "cwp.hWnd=" & cwp.hWnd, Timer
-            Set m_pSubclassThunk = InitSubclassingThunk(cwp.hWnd, ObjPtr(Me), AddressOfWndProc.ListWndProc(0, 0, 0, 0))
+            Set m_pSubclassThunk = InitSubclassingThunk(cwp.hWnd, Me, AddressOfWndProc.ListWndProc(0, 0, 0, 0))
         End If
     End If
     HookProc = CallNextHookProc(m_pHookThunk, nCode, wParam, lParam)
