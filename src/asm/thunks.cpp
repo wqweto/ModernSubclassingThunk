@@ -8,18 +8,19 @@
 // See the LICENSE file in the project root for more information
 //
 //=========================================================================
-#include <stdio.h>
-#include <windows.h>
-#include <commctrl.h>
-
-#pragma comment(lib, "crypt32")
-#pragma comment(lib, "comctl32")
 
 //#define IMPL_ADDRESSOFMETHOD_THUNK
 //#define IMPL_SUBCLASSING_THUNK
 //#define IMPL_HOOKING_THUNK
 //#define IMPL_FIREONCETIMER_THUNK
 #define IMPL_CLEANUP_THUNK
+
+#include <stdio.h>
+#include <windows.h>
+#include <commctrl.h>
+
+#pragma comment(lib, "crypt32")
+#pragma comment(lib, "comctl32")
 
 LPWSTR __stdcall GetCurrentDateTime()
 {
@@ -410,8 +411,7 @@ __Release:
         mov     edx, dword ptr [esp+4]          // edx = param this
         dec     dword ptr [edx+m_dwRefCnt]
         mov     eax, dword ptr [edx+m_dwRefCnt]
-        cmp     eax, 0
-        jg      __exit_Release
+        jnz     __exit_Release
         
         // invoke RemoveWindowSubclass(this->hWnd, __SubclassProc, this)
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
@@ -726,8 +726,7 @@ __Release:
         mov     edx, dword ptr [esp+4]          // param this
         dec     dword ptr [edx+m_dwRefCnt]
         mov     eax, dword ptr [edx+m_dwRefCnt]
-        cmp     eax, 0
-        jg      __exit_Release
+        jnz     __exit_Release
         
         // invoke UnhookWindowsHookEx(this->hHook)
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
@@ -895,9 +894,10 @@ enum InstanceData {
     m_pVtbl = 0,
     m_dwRefCnt = 4,
     m_dwTimerID = 8,
-    m_pCallbackThis = 12,
-    m_pfnCallback = 16,
-    sizeof_InstanceData = 20,
+    m_pfnPushParamThunk = 12,
+    m_pCallbackThis = 16,
+    m_pfnCallback = 20,
+    sizeof_InstanceData = 24,
 };
 enum ThunkData {
     t_pfnQI = 0,
@@ -970,18 +970,37 @@ __skip_init_thunk_data:
         stosd                                   // this->dwRefCnt
         xor     eax, eax
         stosd                                   // this->dwTimerID
+        stosd                                   // this->pfnTimerProc
         mov     esi, dword ptr [esp+20]         // param wParam
         movsd                                   // wParam->pCallbackThis
         movsd                                   // wParam->pfnCallback
         sub     edi, sizeof_InstanceData        // rewind this ptr
 
         // init pfnPushParamThunk
+        mov     eax, dword ptr [edx+t_PushParamIdx]
+        dec     eax
+        and     eax, countof_PushParamThunk - 1
+        push    eax
+__loop_find_empty_slot:
         mov     ecx, dword ptr [edx+t_PushParamIdx]
+        cmp     ecx, dword ptr [esp]
+        jne     __has_empty_slot
+        // no empty slot available
+        pop     eax
+        mov     ecx, dword ptr [edi]            // ecx = this->pVtbl
+        push    edi
+        call    dword ptr [ecx+t_pfnCoTaskMemFree]
+        xor     edi, edi                        // *lParam = NULL
+        jmp     __exit_init
+__has_empty_slot:
         inc     dword ptr [edx+t_PushParamIdx]
         and     dword ptr [edx+t_PushParamIdx], countof_PushParamThunk - 1
         lea     eax, [edx + 8*ecx]
         lea     eax, [eax + 8*ecx]
         lea     ecx, [eax + 4*ecx + sizeof_ThunkData] // ecx = pfnPushParamThunk
+        cmp     byte ptr [ecx+sizeof_PushParamThunk-1], 0
+        jne     __loop_find_empty_slot
+        pop     eax
         mov     dword ptr [ecx+0], 0xB82434FF
         mov     dword ptr [ecx+4], edi
         mov     dword ptr [ecx+8], 0x04244489
@@ -996,9 +1015,10 @@ __skip_init_thunk_data:
         shr     eax, 24
         add     eax, 0x90E0FF00
         mov     dword ptr [ecx+16], eax
+        mov     dword ptr [edi+m_pfnPushParamThunk], ecx
 
-        // this->dwTimerID = SetTimer(0, 0, Delay, pfnPushParamThunk)
-        push    ecx                             // pfnPushParamThunk (for lpTimerFunc)
+        // this->dwTimerID = SetTimer(0, 0, Delay, this->pfnPushParamThunk)
+        push    ecx                             // for lpTimerFunc
         push    dword ptr [esp+20]              // param wMsg (for Delay)
         push    0                               // for nIDEvent
         push    0                               // for hWnd
@@ -1007,6 +1027,7 @@ __skip_init_thunk_data:
         mov     dword ptr [edi+m_dwTimerID], eax
 
         // retval & epilog
+__exit_init:
         mov     eax, dword ptr [esp+24]         // param lParam
         mov     dword ptr [eax], edi            // *lParam = this
         pop     esi
@@ -1049,8 +1070,11 @@ __Release:
         mov     edx, dword ptr [esp+4]          // param this
         dec     dword ptr [edx+m_dwRefCnt]
         mov     eax, dword ptr [edx+m_dwRefCnt]
-        cmp     eax, 0
-        jg      __exit_Release
+        jnz     __exit_Release
+
+        // clear PushParamThunk slot
+        mov     eax, dword ptr [edx+m_pfnPushParamThunk]
+        mov     byte ptr [eax+sizeof_PushParamThunk-1], 0
         
         // invoke KillTimer(0, this->dwTimerId)
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
@@ -1096,6 +1120,7 @@ __TimerProc:
         pop     edx
         test    eax, WS_DISABLED
         jnz     __skip_callback
+__call_callback:
         // invoke KillTimer(0, this->dwTimerId)
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    edx
@@ -1103,7 +1128,6 @@ __TimerProc:
         push    0                               // 0 (for hWnd)
         call    dword ptr [ecx+t_pfnKillTimer]
         pop     edx
-__call_callback:
         inc     dword ptr [edx+m_dwRefCnt]      // __AddRef
         xor     eax, eax                        // pRetVal
         push    eax
@@ -1313,8 +1337,7 @@ __Release:
         mov     edx, dword ptr [esp+4]          // edx = param this
         dec     dword ptr [edx+m_dwRefCnt]
         mov     eax, dword ptr [edx+m_dwRefCnt]
-        cmp     eax, 0
-        jg      __exit_Release
+        jnz     __exit_Release
         
         // invoke this->pfnCleanup(this->hHandle)
         push    dword ptr [edx+m_hHandle]
