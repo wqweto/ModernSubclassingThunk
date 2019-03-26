@@ -178,7 +178,9 @@ Private Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal 
         aParams(5) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 412)      '--- 412 = RemoveWindowSubclass ordinal
         aParams(6) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 413)      '--- 413 = DefSubclassProc ordinal
         #If Not ImplNoVBIDESupport Then
-            aParams(7) = hIdeOwner
+            If Ambient.UserMode Then
+                aParams(7) = hIdeOwner
+            End If
             If aParams(7) <> 0 Then
                 aParams(8) = GetProcAddress(GetModuleHandle("user32"), "GetWindowLongA")
                 aParams(9) = GetProcAddress(GetModuleHandle("vba6"), "EbMode")
