@@ -35,8 +35,9 @@ Private Declare Function GetProcAddressByOrdinal Lib "kernel32" Alias "GetProcAd
 Private Declare Function DefSubclassProc Lib "comctl32" Alias "#413" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
 Private Declare Function CallNextHookEx Lib "user32" (ByVal hHook As Long, ByVal nCode As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
 #If Not ImplNoVBIDESupport Then
-    Private Declare Function EnumThreadWindows Lib "user32" (ByVal dwThreadID As Long, ByVal lpfn As Long, ByVal lParam As Long) As Long
-    Private Declare Function GetClassName Lib "user32" Alias "GetClassNameA" (ByVal hWnd As Long, ByVal lpClassName As String, ByVal nMaxCount As Long) As Long
+    Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As Long, ByVal hWndChildAfter As Long, ByVal lpszClass As String, ByVal lpszWindow As String) As Long
+    Private Declare Function GetWindowThreadProcessId Lib "user32" (ByVal hWnd As Long, lpdwProcessId As Long) As Long
+    Private Declare Function GetCurrentProcessId Lib "kernel32" () As Long
 #End If
 
 '=========================================================================
@@ -74,8 +75,8 @@ Public Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal p
         aParams(5) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 412)      '--- 412 = RemoveWindowSubclass ordinal
         aParams(6) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 413)      '--- 413 = DefSubclassProc ordinal
         #If Not ImplNoVBIDESupport Then
-            If InIde Then
-                aParams(7) = hIdeOwner
+            aParams(7) = hIdeOwner
+            If aParams(7) <> 0 Then
                 aParams(8) = GetProcAddress(GetModuleHandle("user32"), "GetWindowLongA")
                 aParams(9) = GetProcAddress(GetModuleHandle("vba6"), "EbMode")
                 aParams(10) = GetProcAddress(GetModuleHandle("vba6"), "EbIsResetting")
@@ -110,8 +111,8 @@ Public Function InitHookingThunk(ByVal idHook As Long, pObj As Object, ByVal pfn
         aParams(5) = GetProcAddress(GetModuleHandle("user32"), "UnhookWindowsHookEx")
         aParams(6) = GetProcAddress(GetModuleHandle("user32"), "CallNextHookEx")
         #If Not ImplNoVBIDESupport Then
-            If InIde Then
-                aParams(7) = hIdeOwner
+            aParams(7) = hIdeOwner
+            If aParams(7) <> 0 Then
                 aParams(8) = GetProcAddress(GetModuleHandle("user32"), "GetWindowLongA")
                 aParams(9) = GetProcAddress(GetModuleHandle("vba6"), "EbMode")
                 aParams(10) = GetProcAddress(GetModuleHandle("vba6"), "EbIsResetting")
@@ -149,8 +150,8 @@ Public Function InitFireOnceTimerThunk(pObj As Object, ByVal pfnCallback As Long
         aParams(4) = GetProcAddress(GetModuleHandle("user32"), "SetTimer")
         aParams(5) = GetProcAddress(GetModuleHandle("user32"), "KillTimer")
         #If Not ImplNoVBIDESupport Then
-            If InIde Then
-                aParams(6) = hIdeOwner
+            aParams(6) = hIdeOwner
+            If aParams(6) <> 0 Then
                 aParams(7) = GetProcAddress(GetModuleHandle("user32"), "GetWindowLongA")
                 aParams(8) = GetProcAddress(GetModuleHandle("vba6"), "EbMode")
                 aParams(9) = GetProcAddress(GetModuleHandle("vba6"), "EbIsResetting")
@@ -201,28 +202,12 @@ Public Function InitCleanupThunk(ByVal hHandle As Long, sModuleName As String, s
 End Function
 
 #If Not ImplNoVBIDESupport Then
-Private Property Get InIde() As Boolean
-    Debug.Assert pvSetTrue(InIde)
-End Property
-
-Private Function pvSetTrue(bValue As Boolean) As Boolean
-    bValue = True
-    pvSetTrue = True
-End Function
-
 Private Property Get hIdeOwner() As Long
-    Call EnumThreadWindows(App.ThreadID, AddressOf pvEnumIdeOwner, VarPtr(hIdeOwner))
-End Property
-
-Private Function pvEnumIdeOwner(ByVal hWnd As Long, lResult As Long) As Long
-    Dim sBuffer         As String
+    Dim lProcessId      As Long
     
-    sBuffer = String$(50, 0)
-    Call GetClassName(hWnd, sBuffer, Len(sBuffer) - 1)
-    If Left$(sBuffer, InStr(sBuffer, vbNullChar) - 1) = "IDEOwner" Then
-        lResult = hWnd
-        Exit Function
-    End If
-    pvEnumIdeOwner = 1
-End Function
+    Do
+        hIdeOwner = FindWindowEx(0, hIdeOwner, "IDEOwner", vbNullString)
+        Call GetWindowThreadProcessId(hIdeOwner, lProcessId)
+    Loop While hIdeOwner <> 0 And lProcessId <> GetCurrentProcessId()
+End Property
 #End If
