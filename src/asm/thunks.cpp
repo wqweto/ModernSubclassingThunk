@@ -434,7 +434,7 @@ __SubclassProc:
         push    ebp                             
         mov     ebp, esp
         mov     edx, dword ptr [ebp+24]         // this ptr = param uIdSubclass
-        // if EbMode() <> 1 goto __skip_callback
+        // if EbMode() > 1 goto __skip_callback
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         mov     eax, dword ptr [ecx+t_pfnEbMode]
         test    eax, eax
@@ -443,7 +443,7 @@ __SubclassProc:
         call    eax
         pop     edx                             // restore this ptr
         cmp     eax, 1
-        jne     __call_def_subclass
+        ja      __call_def_subclass
         // if EbIsResetting() goto __skip_callback
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    edx
@@ -747,7 +747,7 @@ __HookProc:
         push    ebp
         mov     ebp, esp
         mov     edx, dword ptr [ebp+8]          // this ptr
-        // if EbMode() <> 1 goto __skip_callback
+        // if EbMode() > 1 goto __skip_callback
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         mov     eax, dword ptr [ecx+t_pfnEbMode]
         test    eax, eax
@@ -756,7 +756,7 @@ __HookProc:
         call    eax                             // this->pfnEbMode
         pop     edx
         cmp     eax, 1                          // 1 = running
-        jne     __skip_callback
+        ja      __skip_callback
         // if EbIsResetting() goto __skip_callback
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    edx
@@ -1094,7 +1094,7 @@ __exit_Release:
         align   4
 __TimerProc:
         mov     edx, dword ptr [esp+4]          // this ptr
-        // if EbMode() <> 1 goto __skip_callback
+        // if EbMode() > 1 goto __skip_callback
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         mov     eax, dword ptr [ecx+t_pfnEbMode]
         test    eax, eax
@@ -1103,7 +1103,7 @@ __TimerProc:
         call    eax                             // this->pfnEbMode
         pop     edx
         cmp     eax, 1                          // 1 = running
-        jne     __skip_callback
+        ja      __skip_callback
         // if EbIsResetting() goto __skip_callback
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    edx

@@ -160,7 +160,7 @@ Private Function InitAddressOfMethod(pObj As Object, ByVal MethodParamCount As L
 End Function
 
 Private Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal pfnCallback As Long) As IUnknown
-    Const STR_THUNK     As String = "6AAAAABag+oFgepwECQBV1aLdCQUg8YIgz4AdC+L+oHH3BEkAYvCBQQRJAGri8IFQBEkAauLwgVQESQBq4vCBXgRJAGruQkAAADzpYHC3BEkAVJqFP9SEFqL+IvCq7gBAAAAq4tEJAyri3QkFKWlg+8UagBX/3IM/3cI/1IYi0QkGIk4Xl+4EBIkAS1wECQBwhAAkItEJAiDOAB1KoN4BAB1JIF4CMAAAAB1G4F4DAAAAEZ1EotUJAT/QgSLRCQMiRAzwMIMALgCQACAwgwAkItUJAT/QgSLQgTCBAAPHwCLVCQE/0oEi0IEdRiLClL/cQz/cgj/URyLVCQEiwpS/1EUM8DCBACQVYvsi1UYiwqLQSyFwHQnUv/QWoP4AXU3iwpS/1EwWoXAdSyLClJq8P9xJP9RKFqpAAAACHUZM8BQVP91FP91EP91DP91CP9yDP9SEFjrEYsK/3UU/3UQ/3UM/3UI/1EgXcIYAA==" ' 25.3.2019 14:02:14
+    Const STR_THUNK     As String = "6AAAAABag+oFgepwEBEAV1aLdCQUg8YIgz4AdC+L+oHH3BERAIvCBQQREQCri8IFQBERAKuLwgVQEREAq4vCBXgREQCruQkAAADzpYHC3BERAFJqFP9SEFqL+IvCq7gBAAAAq4tEJAyri3QkFKWlg+8UagBX/3IM/3cI/1IYi0QkGIk4Xl+4EBIRAC1wEBEAwhAAkItEJAiDOAB1KoN4BAB1JIF4CMAAAAB1G4F4DAAAAEZ1EotUJAT/QgSLRCQMiRAzwMIMALgCQACAwgwAkItUJAT/QgSLQgTCBAAPHwCLVCQE/0oEi0IEdRiLClL/cQz/cgj/URyLVCQEiwpS/1EUM8DCBACQVYvsi1UYiwqLQSyFwHQnUv/QWoP4AXc3iwpS/1EwWoXAdSyLClJq8P9xJP9RKFqpAAAACHUZM8BQVP91FP91EP91DP91CP9yDP9SEFjrEYsK/3UU/3UQ/3UM/3UI/1EgXcIYAA==" ' 27.3.2019 9:13:15
     Const THUNK_SIZE    As Long = 416
     Static hThunk       As Long
     Dim aParams(0 To 10) As Long
@@ -177,10 +177,8 @@ Private Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal 
         aParams(4) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 410)      '--- 410 = SetWindowSubclass ordinal
         aParams(5) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 412)      '--- 412 = RemoveWindowSubclass ordinal
         aParams(6) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 413)      '--- 413 = DefSubclassProc ordinal
-        '--- note: no IDE protection at design-time
-        If Ambient.UserMode Then
-            Debug.Assert pvGetIdeOwner(aParams(7))
-        End If
+        '--- for IDE protection
+        Debug.Assert pvGetIdeOwner(aParams(7))
         If aParams(7) <> 0 Then
             aParams(8) = GetProcAddress(GetModuleHandle("user32"), "GetWindowLongA")
             aParams(9) = GetProcAddress(GetModuleHandle("vba6"), "EbMode")
