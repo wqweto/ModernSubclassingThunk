@@ -434,7 +434,7 @@ __SubclassProc:
         push    ebp                             
         mov     ebp, esp
         mov     edx, dword ptr [ebp+24]         // this ptr = param uIdSubclass
-        // if EbMode() > 1 goto __skip_callback
+        // if EbMode() > 1 goto __call_def_subclass
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         mov     eax, dword ptr [ecx+t_pfnEbMode]
         test    eax, eax
@@ -444,7 +444,13 @@ __SubclassProc:
         pop     edx                             // restore this ptr
         cmp     eax, 1
         ja      __call_def_subclass
-        // if EbIsResetting() goto __skip_callback
+        // if EbMode() == 0 And wMsg == WM_LBUTTONDBLCLK goto __call_def_subclass
+        cmp     eax, 0
+        jne     __not_design_time
+        cmp     dword ptr [ebp+12], WM_LBUTTONDBLCLK
+        je      __call_def_subclass
+__not_design_time:
+        // if EbIsResetting() goto __call_def_subclass
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    edx
         call    dword ptr [ecx+t_pfnEbIsResetting]
@@ -461,17 +467,25 @@ __SubclassProc:
         test    eax, WS_DISABLED
         jnz     __call_def_subclass
 __call_callback:
+        push    edx
         xor     eax, eax
         push    eax
-        push    esp                             // pRetVal
+        push    eax
+        lea     eax, [esp+4]
+        push    eax                             // &RetVal
+        lea     eax, [esp+4]
+        push    eax                             // &Handled
         push    dword ptr [ebp+20]              // param lParam
         push    dword ptr [ebp+16]              // param wParam
         push    dword ptr [ebp+12]              // param uMsg
         push    dword ptr [ebp+8]               // param hWnd
         push    dword ptr [edx+m_pCallbackThis]
         call    dword ptr [edx+m_pfnCallback]
-        pop     eax
-        jmp     __exit_SubclassProc
+        pop     ecx                             // Handled
+        pop     eax                             // RetVal
+        pop     edx
+        test    ecx, ecx
+        jnz     __exit_SubclassProc
 __call_def_subclass:
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    dword ptr [ebp+20]              // param lParam
@@ -503,7 +517,7 @@ __end:
 
 #define THUNK_SIZE ((char *)main - (char *)SubclassingThunk)
 
-HRESULT __stdcall SubclassProc(void *self, HWND hWnd, UINT uMsg, LPARAM lParam, WPARAM wParam, LRESULT *pRetVal);
+HRESULT __stdcall SubclassProc(void *self, HWND hWnd, UINT uMsg, LPARAM lParam, WPARAM wParam, bool *bHandled, LRESULT *pRetVal);
 
 void main()
 {
@@ -540,14 +554,16 @@ void main()
     CryptBinaryToString((BYTE *)SubclassingThunk, dwSize - sizeof_ThunkData, CRYPT_STRING_BASE64, szBuffer, &dwBufSize);
     for(int i = 0, j = 0; (szBuffer[j] = szBuffer[i]) != 0; )
         ++i, j += (szBuffer[j] != '\r' && szBuffer[j] != '\n');
-    printf("Const STR_THUNK     As String = \"%S\" ' %S\n", szBuffer, GetCurrentDateTime());
+    printf("    Const STR_THUNK     As String = \"%S\" ' %S\n", szBuffer, GetCurrentDateTime());
+    printf("    Const THUNK_SIZE    As Long = %d\n", dwSize);
 }
 
-HRESULT __stdcall SubclassProc(void *self, HWND hWnd, UINT uMsg, LPARAM lParam, WPARAM wParam, LRESULT *pRetVal)
+HRESULT __stdcall SubclassProc(void *self, HWND hWnd, UINT uMsg, LPARAM lParam, WPARAM wParam, bool *bHandled, LRESULT *pRetVal)
 {
     printf("uMsg=%04X\n", uMsg);
     *pRetVal = DefSubclassProc(hWnd, uMsg, lParam, wParam);
     *pRetVal = 0x123;
+    *bHandled = true;
     return S_OK;
 }
 #endif
@@ -747,7 +763,7 @@ __HookProc:
         push    ebp
         mov     ebp, esp
         mov     edx, dword ptr [ebp+8]          // this ptr
-        // if EbMode() > 1 goto __skip_callback
+        // if EbMode() > 1 goto __call_next_hook
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         mov     eax, dword ptr [ecx+t_pfnEbMode]
         test    eax, eax
@@ -756,14 +772,14 @@ __HookProc:
         call    eax                             // this->pfnEbMode
         pop     edx
         cmp     eax, 1                          // 1 = running
-        ja      __skip_callback
-        // if EbIsResetting() goto __skip_callback
+        ja      __call_next_hook
+        // if EbIsResetting() goto __call_next_hook
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    edx
         call    dword ptr [ecx+t_pfnEbIsResetting]
         pop     edx                             // restore this ptr
         test    eax, eax
-        jnz      __skip_callback
+        jnz      __call_next_hook
         // invoke GetWindowLong(this->hIdeOwner, GWL_STYLE)
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    edx
@@ -772,19 +788,27 @@ __HookProc:
         call    dword ptr [ecx+t_pfnGetWindowLong]
         pop     edx
         test    eax, WS_DISABLED
-        jnz     __skip_callback
+        jnz     __call_next_hook
 __call_callback:
+        push    edx
         xor     eax, eax
         push    eax
-        push    esp                             // pRetVal
+        push    eax
+        lea     eax, [esp+4]
+        push    eax                             // &RetVal
+        lea     eax, [esp+4]
+        push    eax                             // &Handled
         push    dword ptr [ebp+20]              // param lParam
         push    dword ptr [ebp+16]              // param wParam
         push    dword ptr [ebp+12]              // param nCode
         push    dword ptr [edx+m_pCallbackThis]
         call    dword ptr [edx+m_pfnCallback]
+        pop     ecx                             // Handled
         pop     eax                             // RetVal
-        jmp     __exit_HookProc
-__skip_callback:
+        pop     edx
+        test    ecx, ecx
+        jnz     __exit_HookProc
+__call_next_hook:
         // invoke CallNextHookEx(hHook, nCode, wParam, lParam)
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    dword ptr [ebp+20]              // param lParam
@@ -821,7 +845,7 @@ __PushParamThunk:
 
 #define THUNK_SIZE ((char *)main - (char *)HookingThunk)
 
-HRESULT __stdcall HookProc(void *self, int nCode, WPARAM wParam, LPARAM lParam, LRESULT *pRetVal);
+HRESULT __stdcall HookProc(void *self, int nCode, WPARAM wParam, LPARAM lParam, bool *Handled, LRESULT *pRetVal);
 
 void main()
 {
@@ -845,9 +869,9 @@ void main()
     memcpy(hThunk, HookingThunk, THUNK_SIZE);
     IUnknown *pUnk = 0;
     printf("GetCurrentThreadId()=%04X\n", GetCurrentThreadId());
-    DWORD dwSize = CallWindowProc((WNDPROC)hThunk, (HWND)WH_CALLWNDPROC, GetCurrentThreadId(), (WPARAM)&p, (LPARAM)&pUnk);
-    printf("dwSize=%d\nsizeof_InstanceData=%d\n", dwSize, sizeof_InstanceData);
-    dwSize -= countof_PushParamThunk * sizeof_PushParamThunk;
+    DWORD dwThunkSize = CallWindowProc((WNDPROC)hThunk, (HWND)WH_CALLWNDPROC, GetCurrentThreadId(), (WPARAM)&p, (LPARAM)&pUnk);
+    printf("dwThunkSize=%d\nsizeof_InstanceData=%d\n", dwThunkSize, sizeof_InstanceData);
+    DWORD dwSize = dwThunkSize - countof_PushParamThunk * sizeof_PushParamThunk;
     printf("offset __PushParamThunk=%d\n", dwSize);
     dwSize -= sizeof_ThunkData;
     printf("offset __vtable=%d\n", dwSize);
@@ -862,16 +886,17 @@ void main()
     CryptBinaryToString((BYTE *)HookingThunk, dwSize, CRYPT_STRING_BASE64, szBuffer, &dwBufSize);
     for(int i = 0, j = 0; (szBuffer[j] = szBuffer[i]) != 0; )
         ++i, j += (szBuffer[j] != '\r' && szBuffer[j] != '\n');
-    printf("Const STR_THUNK     As String = \"%S\" ' %S\n", szBuffer, GetCurrentDateTime());
+    printf("    Const STR_THUNK     As String = \"%S\" ' %S\n", szBuffer, GetCurrentDateTime());
+    printf("    Const THUNK_SIZE    As Long = %d\n", dwThunkSize);
 }
 
-HRESULT __stdcall HookProc(void *self, int nCode, WPARAM wParam, LPARAM lParam, LRESULT *pRetVal)
+HRESULT __stdcall HookProc(void *self, int nCode, WPARAM wParam, LPARAM lParam, bool *Handled, LRESULT *pRetVal)
 {
     if (nCode == HC_ACTION) {
         CWPSTRUCT *cwp = (CWPSTRUCT *)lParam;
         printf("hwnd=%d, message=%d, wParam=%08X, lParam=%08X\n", cwp->hwnd, cwp->message, cwp->wParam, cwp->lParam);
     }
-    *pRetVal = CallNextHookEx((HHOOK)((int *)self)[2], nCode, wParam, lParam);
+    //*pRetVal = CallNextHookEx((HHOOK)((int *)self)[2], nCode, wParam, lParam);
     return S_OK;
 }
 #endif

@@ -34,8 +34,11 @@ Private Declare Function GetProcAddress Lib "kernel32" (ByVal hModule As Long, B
 Private Declare Function GetProcAddressByOrdinal Lib "kernel32" Alias "GetProcAddress" (ByVal hModule As Long, ByVal lpProcOrdinal As Long) As Long
 Private Declare Function DefSubclassProc Lib "comctl32" Alias "#413" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
 Private Declare Function CallNextHookEx Lib "user32" (ByVal hHook As Long, ByVal nCode As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As Long, ByVal hWndChildAfter As Long, ByVal lpszClass As String, ByVal lpszWindow As String) As Long
+Private Declare Function CreateWindowEx Lib "user32" Alias "CreateWindowExA" (ByVal dwExStyle As Long, ByVal lpClassName As String, ByVal lpWindowName As String, ByVal dwStyle As Long, ByVal X As Long, ByVal Y As Long, ByVal nWidth As Long, ByVal nHeight As Long, ByVal hWndParent As Long, ByVal hMenu As Long, ByVal hInstance As Long, lpParam As Any) As Long
+Private Declare Function GetProp Lib "user32" Alias "GetPropA" (ByVal hWnd As Long, ByVal lpString As String) As Long
+Private Declare Function SetProp Lib "user32" Alias "SetPropA" (ByVal hWnd As Long, ByVal lpString As String, ByVal hData As Long) As Long
 #If Not ImplNoIdeProtection Then
-    Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As Long, ByVal hWndChildAfter As Long, ByVal lpszClass As String, ByVal lpszWindow As String) As Long
     Private Declare Function GetWindowThreadProcessId Lib "user32" (ByVal hWnd As Long, lpdwProcessId As Long) As Long
     Private Declare Function GetCurrentProcessId Lib "kernel32" () As Long
 #End If
@@ -57,14 +60,15 @@ Public Function InitAddressOfMethod(pObj As Object, ByVal MethodParamCount As Lo
 End Function
 
 Public Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal pfnCallback As Long) As IUnknown
-    Const STR_THUNK     As String = "6AAAAABag+oFgepwEBEAV1aLdCQUg8YIgz4AdC+L+oHH3BERAIvCBQQREQCri8IFQBERAKuLwgVQEREAq4vCBXgREQCruQkAAADzpYHC3BERAFJqFP9SEFqL+IvCq7gBAAAAq4tEJAyri3QkFKWlg+8UagBX/3IM/3cI/1IYi0QkGIk4Xl+4EBIRAC1wEBEAwhAAkItEJAiDOAB1KoN4BAB1JIF4CMAAAAB1G4F4DAAAAEZ1EotUJAT/QgSLRCQMiRAzwMIMALgCQACAwgwAkItUJAT/QgSLQgTCBAAPHwCLVCQE/0oEi0IEdRiLClL/cQz/cgj/URyLVCQEiwpS/1EUM8DCBACQVYvsi1UYiwqLQSyFwHQnUv/QWoP4AXc3iwpS/1EwWoXAdSyLClJq8P9xJP9RKFqpAAAACHUZM8BQVP91FP91EP91DP91CP9yDP9SEFjrEYsK/3UU/3UQ/3UM/3UI/1EgXcIYAA==" ' 27.3.2019 9:13:15
-    Const THUNK_SIZE    As Long = 416
-    Static hThunk       As Long
+    Const STR_THUNK     As String = "6AAAAABag+oFgepwEDMAV1aLdCQUg8YIgz4AdC+L+oHH/BEzAIvCBQQRMwCri8IFQBEzAKuLwgVQETMAq4vCBXgRMwCruQkAAADzpYHC/BEzAFJqFP9SEFqL+IvCq7gBAAAAq4tEJAyri3QkFKWlg+8UagBX/3IM/3cI/1IYi0QkGIk4Xl+4MBIzAC1wEDMAwhAAkItEJAiDOAB1KoN4BAB1JIF4CMAAAAB1G4F4DAAAAEZ1EotUJAT/QgSLRCQMiRAzwMIMALgCQACAwgwAkItUJAT/QgSLQgTCBAAPHwCLVCQE/0oEi0IEdRiLClL/cQz/cgj/URyLVCQEiwpS/1EUM8DCBACQVYvsi1UYiwqLQSyFwHQ1Uv/QWoP4AXdUg/gAdQmBfQwDAgAAdEaLClL/UTBahcB1O4sKUmrw/3Ek/1EoWqkAAAAIdShSM8BQUI1EJARQjUQkBFD/dRT/dRD/dQz/dQj/cgz/UhBZWFqFyXURiwr/dRT/dRD/dQz/dQj/USBdwhgADx8A" ' 29.3.2019 13:04:54
+    Const THUNK_SIZE    As Long = 448
+    Dim hThunk          As Long
     Dim aParams(0 To 10) As Long
     Dim lSize           As Long
     
     aParams(0) = ObjPtr(pObj)
     aParams(1) = pfnCallback
+    hThunk = GetProp(pvGetGlobalHwnd(), "InitSubclassingThunk")
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
         Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
@@ -81,6 +85,7 @@ Public Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal p
             aParams(9) = GetProcAddress(GetModuleHandle("vba6"), "EbMode")
             aParams(10) = GetProcAddress(GetModuleHandle("vba6"), "EbIsResetting")
         End If
+        Call SetProp(pvGetGlobalHwnd(), "InitSubclassingThunk", hThunk)
     End If
     lSize = CallWindowProc(hThunk, hWnd, 0, VarPtr(aParams(0)), VarPtr(InitSubclassingThunk))
     Debug.Assert lSize = THUNK_SIZE
@@ -93,14 +98,15 @@ Public Function CallNextSubclassProc(pSubclass As IUnknown, ByVal hWnd As Long, 
 End Function
 
 Public Function InitHookingThunk(ByVal idHook As Long, pObj As Object, ByVal pfnCallback As Long) As IUnknown
-    Const STR_THUNK     As String = "6AAAAABag+oFgepwEC0BV1aLdCQUg8YIgz4AdCqL+oHHKBItAYvCBVQRLQGri8IFkBEtAauLwgWgES0BqzPAq7kJAAAA86WBwigSLQFSahT/UhBai/iLwqu4AQAAAKszwKuLdCQUpaWD7xSLSgz/QgyBYgz/AAAAjQTKjQTIjUyINMcB/zQkuIl5BMdBCIlEJASLwi0oEi0BBcQRLQFQweAIBbgAAACJQQxYwegYBQD/4JCJQRD/dCQQagBR/3QkGIsP/1EYiUcIi0QkGIk4Xl+4XBItAS1wEC0BBQAUAADCEACQi0QkCIM4AHUqg3gEAHUkgXgIwAAAAHUbgXgMAAAARnUSi1QkBP9CBItEJAyJEDPAwgwAuAJAAIDCDACQi1QkBP9CBItCBMIEAA8fAItUJAT/SgSLQgR1FIsK/3II/1Eci1QkBIsKUv9RFDPAwgQAkFWL7ItVCIsKi0EshcB0J1L/0FqD+AF3NIsKUv9RMFqFwHUpiwpSavD/cST/UShaqQAAAAh1FjPAUFT/dRT/dRD/dQz/cgz/UhBY6xGLCv91FP91EP91DP9yCP9RIF3CEAAPHwA=" ' 27.3.2019 9:14:12
-    Const THUNK_SIZE    As Long = 5612
-    Static hThunk       As Long
+    Const STR_THUNK     As String = "6AAAAABag+oFgepwEBYAV1aLdCQUg8YIgz4AdCqL+oHHNBIWAIvCBVQRFgCri8IFkBEWAKuLwgWgERYAqzPAq7kJAAAA86WBwjQSFgBSahT/UhBai/iLwqu4AQAAAKszwKuLdCQUpaWD7xSLSgz/QgyBYgz/AAAAjQTKjQTIjUyINMcB/zQkuIl5BMdBCIlEJASLwi00EhYABcQRFgBQweAIBbgAAACJQQxYwegYBQD/4JCJQRD/dCQQagBR/3QkGIsP/1EYiUcIi0QkGIk4Xl+4aBIWAC1wEBYABQAUAADCEACQi0QkCIM4AHUqg3gEAHUkgXgIwAAAAHUbgXgMAAAARnUSi1QkBP9CBItEJAyJEDPAwgwAuAJAAIDCDACQi1QkBP9CBItCBMIEAA8fAItUJAT/SgSLQgR1FIsK/3II/1Eci1QkBIsKUv9RFDPAwgQAkFWL7ItVCIsKi0EshcB0J1L/0FqD+AF3Q4sKUv9RMFqFwHU4iwpSavD/cST/UShaqQAAAAh1JVIzwFBQjUQkBFCNRCQEUP91FP91EP91DP9yDP9SEFlYWoXJdRGLCv91FP91EP91DP9yCP9RIF3CEAA=" ' 29.3.2019 13:27:06
+    Const THUNK_SIZE    As Long = 5624
+    Dim hThunk          As Long
     Dim aParams(0 To 10) As Long
     Dim lSize           As Long
     
     aParams(0) = ObjPtr(pObj)
     aParams(1) = pfnCallback
+    hThunk = GetProp(pvGetGlobalHwnd(), "InitHookingThunk")
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
         Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
@@ -116,6 +122,7 @@ Public Function InitHookingThunk(ByVal idHook As Long, pObj As Object, ByVal pfn
             aParams(9) = GetProcAddress(GetModuleHandle("vba6"), "EbMode")
             aParams(10) = GetProcAddress(GetModuleHandle("vba6"), "EbIsResetting")
         End If
+        Call SetProp(pvGetGlobalHwnd(), "InitHookingThunk", hThunk)
     End If
     lSize = CallWindowProc(hThunk, idHook, App.ThreadID, VarPtr(aParams(0)), VarPtr(InitHookingThunk))
     Debug.Assert lSize = THUNK_SIZE
@@ -134,12 +141,13 @@ End Function
 Public Function InitFireOnceTimerThunk(pObj As Object, ByVal pfnCallback As Long, Optional Delay As Long) As IUnknown
     Const STR_THUNK     As String = "6AAAAABag+oFgeogERkAV1aLdCQUg8YIgz4AdCqL+oHHBBMZAIvCBSgSGQCri8IFZBIZAKuLwgV0EhkAqzPAq7kIAAAA86WBwgQTGQBSahj/UhBai/iLwqu4AQAAAKszwKuri3QkFKWlg+8Yi0IMSCX/AAAAUItKDDsMJHULWIsPV/9RFDP/62P/QgyBYgz/AAAAjQTKjQTIjUyIMIB5EwB101jHAf80JLiJeQTHQQiJRCQEi8ItBBMZAAWgEhkAUMHgCAW4AAAAiUEMWMHoGAUA/+CQiUEQiU8MUf90JBRqAGoAiw//URiJRwiLRCQYiTheX7g0ExkALSARGQAFABQAAMIQAGaQi0QkCIM4AHUqg3gEAHUkgXgIwAAAAHUbgXgMAAAARnUSi1QkBP9CBItEJAyJEDPAwgwAuAJAAIDCDACQi1QkBP9CBItCBMIEAA8fAItUJAT/SgSLQgR1HYtCDMZAEwCLCv9yCGoA/1Eci1QkBIsKUv9RFDPAwgQAi1QkBIsKi0EohcB0J1L/0FqD+AF3SYsKUv9RLFqFwHU+iwpSavD/cSD/USRaqQAAAAh1K4sKUv9yCGoA/1EcWv9CBDPAUFT/chD/UhSLVCQIx0IIAAAAAFLodv///1jCFABmkA==" ' 27.3.2019 9:14:57
     Const THUNK_SIZE    As Long = 5652
-    Static hThunk       As Long
+    Dim hThunk          As Long
     Dim aParams(0 To 9) As Long
     Dim lSize           As Long
     
     aParams(0) = ObjPtr(pObj)
     aParams(1) = pfnCallback
+    hThunk = GetProp(pvGetGlobalHwnd(), "InitFireOnceTimerThunk")
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
         Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
@@ -154,6 +162,7 @@ Public Function InitFireOnceTimerThunk(pObj As Object, ByVal pfnCallback As Long
             aParams(8) = GetProcAddress(GetModuleHandle("vba6"), "EbMode")
             aParams(9) = GetProcAddress(GetModuleHandle("vba6"), "EbIsResetting")
         End If
+        Call SetProp(pvGetGlobalHwnd(), "InitFireOnceTimerThunk", hThunk)
     End If
     lSize = CallWindowProc(hThunk, 0, Delay, VarPtr(aParams(0)), VarPtr(InitFireOnceTimerThunk))
     Debug.Assert lSize = THUNK_SIZE
@@ -180,16 +189,18 @@ End Property
 Public Function InitCleanupThunk(ByVal hHandle As Long, sModuleName As String, sProcName As String) As IUnknown
     Const STR_THUNK     As String = "6AAAAABag+oFgepQEDwBV1aLdCQUgz4AdCeL+oHHPBE8AYvCBcwQPAGri8IFCBE8AauLwgUYETwBq7kCAAAA86WBwjwRPAFSahD/Ugxai/iLwqu4AQAAAKuLRCQMq4tEJBCrg+8Qi0QkGIk4Xl+4UBE8AS1QEDwBwhAAkItEJAiDOAB1KoN4BAB1JIF4CMAAAAB1G4F4DAAAAEZ1EotUJAT/QgSLRCQMiRAzwMIMALgCQACAwgwAkItUJAT/QgSLQgTCBAAPHwCLVCQE/0oEi0IEdRL/cgj/UgyLVCQEiwpS/1EQM8DCBAAPHwA=" ' 25.3.2019 14:03:56
     Const THUNK_SIZE    As Long = 256
-    Static hThunk       As Long
+    Dim hThunk          As Long
     Dim aParams(0 To 1) As Long
     Dim pfnCleanup      As Long
     Dim lSize           As Long
     
+    hThunk = GetProp(pvGetGlobalHwnd(), "InitCleanupThunk")
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
         Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
         aParams(0) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemAlloc")
         aParams(1) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemFree")
+        Call SetProp(pvGetGlobalHwnd(), "InitCleanupThunk", hThunk)
     End If
     pfnCleanup = GetProcAddress(GetModuleHandle(sModuleName), sProcName)
     If pfnCleanup <> 0 Then
@@ -209,3 +220,12 @@ Private Function pvGetIdeOwner(hIdeOwner As Long) As Boolean
     #End If
     pvGetIdeOwner = True
 End Function
+
+Private Function pvGetGlobalHwnd() As Long
+    pvGetGlobalHwnd = FindWindowEx(0, 0, "STATIC", App.hInstance & ":" & App.ThreadID & ":MST Global Data")
+    If pvGetGlobalHwnd = 0 Then
+        pvGetGlobalHwnd = CreateWindowEx(0, "STATIC", App.hInstance & ":" & App.ThreadID & ":MST Global Data", _
+            0, 0, 0, 0, 0, 0, 0, App.hInstance, ByVal 0)
+    End If
+End Function
+

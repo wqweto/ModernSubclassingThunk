@@ -37,11 +37,11 @@ Private WithEvents m_oList      As VB.ListBox
 Attribute m_oList.VB_VarHelpID = -1
 
 Private Property Get pvAddressOfHookProc() As frmTestHook
-    Set pvAddressOfHookProc = InitAddressOfMethod(Me, 3)
+    Set pvAddressOfHookProc = InitAddressOfMethod(Me, 4)
 End Property
 
 Private Property Get pvAddressOfSubclassProc() As frmTestHook
-    Set pvAddressOfSubclassProc = InitAddressOfMethod(Me, 4)
+    Set pvAddressOfSubclassProc = InitAddressOfMethod(Me, 5)
 End Property
 
 Private Sub Form_Click()
@@ -49,31 +49,33 @@ Private Sub Form_Click()
 End Sub
 
 Private Sub Form_Load()
-    Set m_pHook = InitHookingThunk(WH_CALLWNDPROC, Me, pvAddressOfHookProc.CallWndProcHookProc(0, 0, 0))
+    Set m_pHook = InitHookingThunk(WH_CALLWNDPROC, Me, pvAddressOfHookProc.CallWndProcHookProc(0, 0, 0, 0))
     Set m_oList = Controls.Add("VB.ListBox", "lst")
     Debug.Print "m_oList.hWnd=" & m_oList.hWnd, Timer
 End Sub
 
-Public Function CallWndProcHookProc(ByVal nCode As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+Public Function CallWndProcHookProc(ByVal nCode As Long, ByVal wParam As Long, ByVal lParam As Long, Handled As Boolean) As Long
 Attribute CallWndProcHookProc.VB_MemberFlags = "40"
     Dim cwp             As CWPSTRUCT
     
+    #If wParam And Handled Then '--- touch args
+    #End If
     If nCode = HC_ACTION Then
         Call CopyMemory(cwp, ByVal lParam, Len(cwp))
         If cwp.lMessage = WM_CREATE Then
             Debug.Print "cwp.hWnd=" & cwp.hWnd, Timer
-            Set m_pSubclass = InitSubclassingThunk(cwp.hWnd, Me, pvAddressOfSubclassProc.ListSubclassProc(0, 0, 0, 0))
+            Set m_pSubclass = InitSubclassingThunk(cwp.hWnd, Me, pvAddressOfSubclassProc.ListSubclassProc(0, 0, 0, 0, 0))
         End If
     End If
-    CallWndProcHookProc = CallNextHookProc(m_pHook, nCode, wParam, lParam)
 End Function
 
-Public Function ListSubclassProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+Public Function ListSubclassProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long, Handled As Boolean) As Long
 Attribute ListSubclassProc.VB_MemberFlags = "40"
+    #If wParam And lParam And Handled Then '--- touch args
+    #End If
     If wMsg = WM_CREATE Then
         Debug.Print "hWnd=" & hWnd & ", wMsg=" & wMsg & " (WM_CREATE)", Timer
     Else
         Debug.Print "hWnd=" & hWnd & ", wMsg=" & wMsg, Timer
     End If
-    ListSubclassProc = CallNextSubclassProc(m_pSubclass, hWnd, wParam, wParam, lParam)
 End Function

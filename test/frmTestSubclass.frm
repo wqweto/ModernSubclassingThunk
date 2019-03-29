@@ -39,35 +39,35 @@ Option Explicit
 
 Private Const WM_WINDOWPOSCHANGED As Long = &H47
 
-Private Declare Function DefSubclassProc Lib "comctl32" Alias "#413" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
-
 Private m_pSubclass1 As IUnknown
 Private m_pSubclass2 As IUnknown
 
-Public Function SubclassProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+Public Function SubclassProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long, Handled As Boolean) As Long
 Attribute SubclassProc.VB_MemberFlags = "40"
+    #If hWnd And wParam And lParam And Handled Then '--- touch args
+    #End If
     If wMsg = WM_WINDOWPOSCHANGED Then
         Label1.Caption = "wMsg=" & wMsg & "  " & Timer
     End If
-    SubclassProc = DefSubclassProc(hWnd, wMsg, wParam, lParam)
 End Function
 
-Public Function frWndProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
+Public Function frWndProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long, Handled As Boolean) As Long
+    #If hWnd And wParam And lParam And Handled Then '--- touch args
+    #End If
     If wMsg = WM_WINDOWPOSCHANGED Then
         Label2.Caption = "wMsg=" & wMsg & "  " & Timer
     End If
-    frWndProc = DefSubclassProc(hWnd, wMsg, wParam, lParam)
 End Function
 
 Private Property Get pvAddressOfSubclassProc() As frmTestSubclass
-    Set pvAddressOfSubclassProc = InitAddressOfMethod(Me, 4)
+    Set pvAddressOfSubclassProc = InitAddressOfMethod(Me, 5)
 End Property
 
 Private Sub Form_Load()
 '    Dim o As Object
     Set m_pSubclass2 = InitSubclassingThunk(hWnd, Me, AddressOf RedirectFrmTestSubclassWndProc)
-    Set m_pSubclass1 = InitSubclassingThunk(hWnd, Me, pvAddressOfSubclassProc.SubclassProc(0, 0, 0, 0))
-'    Set m_pSubclass2 = InitSubclassingThunk(hWnd, Me, pvAddressOfSubclassProc.frWndProc(0, 0, 0, 0))
+    Set m_pSubclass1 = InitSubclassingThunk(hWnd, Me, pvAddressOfSubclassProc.SubclassProc(0, 0, 0, 0, 0))
+'    Set m_pSubclass2 = InitSubclassingThunk(hWnd, Me, pvAddressOfSubclassProc.frWndProc(0, 0, 0, 0, 0))
 '    Set o = m_pSubclass1
 End Sub
 
