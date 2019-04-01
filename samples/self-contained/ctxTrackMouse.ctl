@@ -17,6 +17,7 @@ Option Explicit
 DefObj A-Z
 
 #Const ImplNoIdeProtection = (MST_NO_IDE_PROTECTION <> 0)
+#Const ImplSelfContained = True
 
 '=========================================================================
 ' Events
@@ -35,10 +36,13 @@ Private Const WM_MOUSELEAVE                 As Long = &H2A3
 Private Const MEM_COMMIT                    As Long = &H1000
 Private Const PAGE_EXECUTE_READWRITE        As Long = &H40
 Private Const CRYPT_STRING_BASE64           As Long = 1
+Private Const SIGN_BIT                      As Long = &H80000000
+Private Const EBMODE_DESIGN                 As Long = 0
 '--- end MST
 
 Private Declare Function TrackMouseEvent Lib "comctl32" Alias "_TrackMouseEvent" (lpEventTrack As TRACKMOUSESTRUCT) As Long
 '--- for Modern Subclassing Thunk (MST)
+Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
 Private Declare Function VirtualAlloc Lib "kernel32" (ByVal lpAddress As Long, ByVal dwSize As Long, ByVal flAllocationType As Long, ByVal flProtect As Long) As Long
 Private Declare Function CryptStringToBinary Lib "crypt32" Alias "CryptStringToBinaryA" (ByVal pszString As String, ByVal cchString As Long, ByVal dwFlags As Long, ByVal pbBinary As Long, pcbBinary As Long, Optional ByVal pdwSkip As Long, Optional ByVal pdwFlags As Long) As Long
 Private Declare Function CallWindowProc Lib "user32" Alias "CallWindowProcA" (ByVal lpPrevWndFunc As Long, ByVal hWnd As Long, ByVal Msg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
@@ -46,13 +50,14 @@ Private Declare Function GetModuleHandle Lib "kernel32" Alias "GetModuleHandleA"
 Private Declare Function GetProcAddress Lib "kernel32" (ByVal hModule As Long, ByVal lpProcName As String) As Long
 Private Declare Function GetProcAddressByOrdinal Lib "kernel32" Alias "GetProcAddress" (ByVal hModule As Long, ByVal lpProcOrdinal As Long) As Long
 Private Declare Function DefSubclassProc Lib "comctl32" Alias "#413" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
-Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As Long, ByVal hWndChildAfter As Long, ByVal lpszClass As String, ByVal lpszWindow As String) As Long
-Private Declare Function CreateWindowEx Lib "user32" Alias "CreateWindowExA" (ByVal dwExStyle As Long, ByVal lpClassName As String, ByVal lpWindowName As String, ByVal dwStyle As Long, ByVal X As Long, ByVal Y As Long, ByVal nWidth As Long, ByVal nHeight As Long, ByVal hWndParent As Long, ByVal hMenu As Long, ByVal hInstance As Long, lpParam As Any) As Long
-Private Declare Function GetProp Lib "user32" Alias "GetPropA" (ByVal hWnd As Long, ByVal lpString As String) As Long
-Private Declare Function SetProp Lib "user32" Alias "SetPropA" (ByVal hWnd As Long, ByVal lpString As String, ByVal hData As Long) As Long
 #If Not ImplNoIdeProtection Then
+    Private Declare Function FindWindowEx Lib "user32" Alias "FindWindowExA" (ByVal hWndParent As Long, ByVal hWndChildAfter As Long, ByVal lpszClass As String, ByVal lpszWindow As String) As Long
     Private Declare Function GetWindowThreadProcessId Lib "user32" (ByVal hWnd As Long, lpdwProcessId As Long) As Long
     Private Declare Function GetCurrentProcessId Lib "kernel32" () As Long
+#End If
+#If ImplSelfContained Then
+    Private Declare Function GetEnvironmentVariable Lib "kernel32" Alias "GetEnvironmentVariableA" (ByVal lpName As String, ByVal lpBuffer As String, ByVal nSize As Long) As Long
+    Private Declare Function SetEnvironmentVariable Lib "kernel32" Alias "SetEnvironmentVariableA" (ByVal lpName As String, ByVal lpValue As String) As Long
 #End If
 '--- end MST
 
@@ -105,8 +110,6 @@ End Sub
 
 Public Function SubclassProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long, Handled As Boolean) As Long
 Attribute SubclassProc.VB_MemberFlags = "40"
-    #If hWnd And wParam And lParam And Handled Then '--- touch args
-    #End If
     Select Case wMsg
     Case WM_MOUSELEAVE, WM_CANCELMODE
         If IsHot Then
@@ -114,6 +117,11 @@ Attribute SubclassProc.VB_MemberFlags = "40"
             RaiseEvent MouseLeave
         End If
     End Select
+    '--- note: performance optimization for design-time subclassing
+    If Not Handled And ThunkPrivateData(m_pSubclass) = EBMODE_DESIGN Then
+        Handled = True
+        SubclassProc = DefSubclassProc(hWnd, wMsg, wParam, lParam)
+    End If
 End Function
 
 '=========================================================================
@@ -163,16 +171,20 @@ Private Function InitAddressOfMethod(pObj As Object, ByVal MethodParamCount As L
     Debug.Assert lSize = THUNK_SIZE
 End Function
 
-Public Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal pfnCallback As Long) As IUnknown
-    Const STR_THUNK     As String = "6AAAAABag+oFgepwEDMAV1aLdCQUg8YIgz4AdC+L+oHH/BEzAIvCBQQRMwCri8IFQBEzAKuLwgVQETMAq4vCBXgRMwCruQkAAADzpYHC/BEzAFJqFP9SEFqL+IvCq7gBAAAAq4tEJAyri3QkFKWlg+8UagBX/3IM/3cI/1IYi0QkGIk4Xl+4MBIzAC1wEDMAwhAAkItEJAiDOAB1KoN4BAB1JIF4CMAAAAB1G4F4DAAAAEZ1EotUJAT/QgSLRCQMiRAzwMIMALgCQACAwgwAkItUJAT/QgSLQgTCBAAPHwCLVCQE/0oEi0IEdRiLClL/cQz/cgj/URyLVCQEiwpS/1EUM8DCBACQVYvsi1UYiwqLQSyFwHQ1Uv/QWoP4AXdUg/gAdQmBfQwDAgAAdEaLClL/UTBahcB1O4sKUmrw/3Ek/1EoWqkAAAAIdShSM8BQUI1EJARQjUQkBFD/dRT/dRD/dQz/dQj/cgz/UhBZWFqFyXURiwr/dRT/dRD/dQz/dQj/USBdwhgADx8A" ' 29.3.2019 13:04:54
-    Const THUNK_SIZE    As Long = 448
-    Dim hThunk          As Long
+Private Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal pfnCallback As Long) As IUnknown
+    Const STR_THUNK     As String = "6AAAAABag+oFgepwEB4BV1aLdCQUg8YIgz4AdC+L+oHHABIeAYvCBQgRHgGri8IFRBEeAauLwgVUER4Bq4vCBXwRHgGruQkAAADzpYHCABIeAVJqGP9SEFqL+IvCq7gBAAAAqzPAq4tEJAyri3QkFKWlg+8YagBX/3IM/3cM/1IYi0QkGIk4Xl+4NBIeAS1wEB4BwhAAZpCLRCQIgzgAdSqDeAQAdSSBeAjAAAAAdRuBeAwAAABGdRKLVCQE/0IEi0QkDIkQM8DCDAC4AkAAgMIMAJCLVCQE/0IEi0IEwgQADx8Ai1QkBP9KBItCBHUYiwpS/3EM/3IM/1Eci1QkBIsKUv9RFDPAwgQAkFWL7ItVGIsKi0EshcB0OFL/0FqJQgiD+AF3VIP4AHUJgX0MAwIAAHRGiwpS/1EwWoXAdTuLClJq8P9xJP9RKFqpAAAACHUoUjPAUFCNRCQEUI1EJARQ/3UU/3UQ/3UM/3UI/3IQ/1IUWVhahcl1EYsK/3UU/3UQ/3UM/3UI/1EgXcIYAA==" ' 1.4.2019 11:41:46
+    Const THUNK_SIZE    As Long = 452
+    Static hThunk       As Long
     Dim aParams(0 To 10) As Long
     Dim lSize           As Long
     
     aParams(0) = ObjPtr(pObj)
     aParams(1) = pfnCallback
-    hThunk = GetProp(pvGetGlobalHwnd(), "InitSubclassingThunk")
+    #If ImplSelfContained Then
+        If hThunk = 0 Then
+            hThunk = pvThunkGlobalData("InitSubclassingThunk")
+        End If
+    #End If
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
         Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
@@ -189,11 +201,22 @@ Public Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal p
             aParams(9) = GetProcAddress(GetModuleHandle("vba6"), "EbMode")
             aParams(10) = GetProcAddress(GetModuleHandle("vba6"), "EbIsResetting")
         End If
-        Call SetProp(pvGetGlobalHwnd(), "InitSubclassingThunk", hThunk)
+        #If ImplSelfContained Then
+            pvThunkGlobalData("InitSubclassingThunk") = hThunk
+        #End If
     End If
     lSize = CallWindowProc(hThunk, hWnd, 0, VarPtr(aParams(0)), VarPtr(InitSubclassingThunk))
     Debug.Assert lSize = THUNK_SIZE
 End Function
+
+Private Property Get ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index As Long) As Long
+    Dim lPtr            As Long
+    
+    lPtr = ObjPtr(pThunk)
+    If lPtr <> 0 Then
+        Call CopyMemory(ThunkPrivateData, ByVal (lPtr Xor SIGN_BIT) + 8 + Index * 4 Xor SIGN_BIT, 4)
+    End If
+End Property
 
 Private Function pvGetIdeOwner(hIdeOwner As Long) As Boolean
     #If Not ImplNoIdeProtection Then
@@ -207,10 +230,16 @@ Private Function pvGetIdeOwner(hIdeOwner As Long) As Boolean
     pvGetIdeOwner = True
 End Function
 
-Private Function pvGetGlobalHwnd() As Long
-    pvGetGlobalHwnd = FindWindowEx(0, 0, "STATIC", App.hInstance & ":" & App.ThreadID & ":MST Global Data")
-    If pvGetGlobalHwnd = 0 Then
-        pvGetGlobalHwnd = CreateWindowEx(0, "STATIC", App.hInstance & ":" & App.ThreadID & ":MST Global Data", _
-            0, 0, 0, 0, 0, 0, 0, App.hInstance, ByVal 0)
-    End If
-End Function
+#If ImplSelfContained Then
+Private Property Get pvThunkGlobalData(sKey As String) As Long
+    Dim sBuffer     As String
+    
+    sBuffer = String$(50, 0)
+    Call GetEnvironmentVariable("_MST_GLOBAL" & App.hInstance & "_" & sKey, sBuffer, Len(sBuffer) - 1)
+    pvThunkGlobalData = Val(Left$(sBuffer, InStr(sBuffer, vbNullChar) - 1))
+End Property
+
+Private Property Let pvThunkGlobalData(sKey As String, ByVal lValue As Long)
+    Call SetEnvironmentVariable("_MST_GLOBAL" & App.hInstance & "_" & sKey, lValue)
+End Property
+#End If
