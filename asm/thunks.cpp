@@ -283,10 +283,11 @@ struct InParams {
 enum InstanceData {
     m_pVtbl = 0,
     m_dwRefCnt = 4,
-    m_hWnd = 8,
-    m_pCallbackThis = 12,
-    m_pfnCallback = 16,
-    sizeof_InstanceData = 20,
+    m_dwEbMode = 8,
+    m_hWnd = 12,
+    m_pCallbackThis = 16,
+    m_pfnCallback = 20,
+    sizeof_InstanceData = 24,
 };
 enum ThunkData {
     t_pfnQI = 0,
@@ -355,6 +356,8 @@ __skip_init_thunk_data:
         stosd                                   // this->pVtbl
         mov     eax, 1
         stosd                                   // this->dwRefCnt
+        xor     eax, eax
+        stosd                                   // this->dwEbMode
         mov     eax, dword ptr [esp+12]         // param hWnd
         stosd                                   // this->hWnd
         mov     esi, dword ptr [esp+20]         // param wParam
@@ -442,6 +445,7 @@ __SubclassProc:
         push    edx
         call    eax
         pop     edx                             // restore this ptr
+        mov     dword ptr [edx+m_dwEbMode], eax // save result
         cmp     eax, 1
         ja      __call_def_subclass
         // if EbMode() == 0 And wMsg == WM_LBUTTONDBLCLK goto __call_def_subclass
@@ -586,10 +590,11 @@ struct InParams {
 enum InstanceData {
     m_pVtbl = 0,
     m_dwRefCnt = 4,
-    m_hHook = 8,
-    m_pCallbackThis = 12,
-    m_pfnCallback = 16,
-    sizeof_InstanceData = 20,
+    m_dwEbMode = 8,
+    m_hHook = 12,
+    m_pCallbackThis = 16,
+    m_pfnCallback = 20,
+    sizeof_InstanceData = 24,
 };
 enum ThunkData {
     t_pfnQI = 0,
@@ -662,6 +667,7 @@ __skip_init_thunk_data:
         mov     eax, 1
         stosd                                   // this->dwRefCnt
         xor     eax, eax
+        stosd                                   // this->dwEbMode
         stosd                                   // this->hHook
         mov     esi, dword ptr [esp+20]         // param wParam
         movsd                                   // wParam->pCallbackThis
@@ -771,6 +777,7 @@ __HookProc:
         push    edx
         call    eax                             // this->pfnEbMode
         pop     edx
+        mov     dword ptr [edx+m_dwEbMode], eax // save result
         cmp     eax, 1                          // 1 = running
         ja      __call_next_hook
         // if EbIsResetting() goto __call_next_hook
@@ -894,7 +901,7 @@ HRESULT __stdcall HookProc(void *self, int nCode, WPARAM wParam, LPARAM lParam, 
 {
     if (nCode == HC_ACTION) {
         CWPSTRUCT *cwp = (CWPSTRUCT *)lParam;
-        printf("hwnd=%d, message=%d, wParam=%08X, lParam=%08X\n", cwp->hwnd, cwp->message, cwp->wParam, cwp->lParam);
+        printf("hwnd=%d, message=%d, wParam=%08X, lParam=%08X\n", (int)cwp->hwnd, cwp->message, cwp->wParam, cwp->lParam);
     }
     //*pRetVal = CallNextHookEx((HHOOK)((int *)self)[2], nCode, wParam, lParam);
     return S_OK;
