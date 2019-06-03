@@ -244,7 +244,11 @@ Public Function InitCleanupThunk(ByVal hHandle As Long, sModuleName As String, s
             pvThunkGlobalData("InitCleanupThunk") = hThunk
         #End If
     End If
-    pfnCleanup = GetProcAddress(GetModuleHandle(sModuleName), sProcName)
+    If Left$(sProcName, 1) = "#" Then
+        pfnCleanup = GetProcByOrdinal(GetModuleHandle(sModuleName), Mid$(sProcName, 2))
+    Else
+        pfnCleanup = GetProcAddress(GetModuleHandle(sModuleName), sProcName)
+    End If
     If pfnCleanup <> 0 Then
         lSize = CallWindowProc(hThunk, hHandle, pfnCleanup, VarPtr(aParams(0)), VarPtr(InitCleanupThunk))
         Debug.Assert lSize = THUNK_SIZE
