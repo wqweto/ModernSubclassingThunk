@@ -21,6 +21,7 @@ DefObj A-Z
 '=========================================================================
 
 Private Const SIGN_BIT                      As Long = &H80000000
+Private Const PTR_SIZE                      As Long = 4
 '--- for thunks
 Private Const MEM_COMMIT                    As Long = &H1000
 Private Const PAGE_EXECUTE_READWRITE        As Long = &H40
@@ -156,7 +157,7 @@ Public Function CallNextHookProc(pHook As IUnknown, ByVal nCode As Long, ByVal w
     
     lPtr = ObjPtr(pHook)
     If lPtr <> 0 Then
-        Call CopyMemory(lPtr, ByVal (lPtr Xor SIGN_BIT) + 12 Xor SIGN_BIT, 4)
+        Call CopyMemory(lPtr, ByVal (lPtr Xor SIGN_BIT) + 12 Xor SIGN_BIT, PTR_SIZE)
     End If
     CallNextHookProc = CallNextHookEx(lPtr, nCode, wParam, lParam)
 End Function
@@ -205,7 +206,7 @@ Property Get ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index As Long) 
     
     lPtr = ObjPtr(pThunk)
     If lPtr <> 0 Then
-        Call CopyMemory(ThunkPrivateData, ByVal (lPtr Xor SIGN_BIT) + 8 + Index * 4 Xor SIGN_BIT, 4)
+        Call CopyMemory(ThunkPrivateData, ByVal (lPtr Xor SIGN_BIT) + 8 + Index * 4 Xor SIGN_BIT, PTR_SIZE)
     End If
 End Property
 
@@ -214,7 +215,7 @@ Property Let ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index As Long, 
     
     lPtr = ObjPtr(pThunk)
     If lPtr <> 0 Then
-        Call CopyMemory(ByVal (lPtr Xor SIGN_BIT) + 8 + Index * 4 Xor SIGN_BIT, lValue, 4)
+        Call CopyMemory(ByVal (lPtr Xor SIGN_BIT) + 8 + Index * 4 Xor SIGN_BIT, lValue, PTR_SIZE)
     End If
 End Property
 
