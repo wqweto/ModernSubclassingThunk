@@ -32,7 +32,7 @@ Private Declare Function CryptStringToBinary Lib "crypt32" Alias "CryptStringToB
 Private Declare Function CallWindowProc Lib "user32" Alias "CallWindowProcA" (ByVal lpPrevWndFunc As Long, ByVal hWnd As Long, ByVal Msg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
 Private Declare Function GetModuleHandle Lib "kernel32" Alias "GetModuleHandleA" (ByVal lpModuleName As String) As Long
 Private Declare Function GetProcAddress Lib "kernel32" (ByVal hModule As Long, ByVal lpProcName As String) As Long
-Private Declare Function GetProcAddressByOrdinal Lib "kernel32" Alias "GetProcAddress" (ByVal hModule As Long, ByVal lpProcOrdinal As Long) As Long
+Private Declare Function GetProcByOrdinal Lib "kernel32" Alias "GetProcAddress" (ByVal hModule As Long, ByVal lpProcOrdinal As Long) As Long
 Private Declare Function DefSubclassProc Lib "comctl32" Alias "#413" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
 Private Declare Function CallNextHookEx Lib "user32" (ByVal hHook As Long, ByVal nCode As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
 #If Not ImplNoIdeProtection Then
@@ -56,6 +56,9 @@ Public Function InitAddressOfMethod(pObj As Object, ByVal MethodParamCount As Lo
     Dim lSize           As Long
     
     hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+    If hThunk = 0 Then
+        Exit Function
+    End If
     Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
     lSize = CallWindowProc(hThunk, ObjPtr(pObj), MethodParamCount, GetProcAddress(GetModuleHandle("kernel32"), "VirtualFree"), VarPtr(InitAddressOfMethod))
     Debug.Assert lSize = THUNK_SIZE
@@ -77,13 +80,16 @@ Public Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal p
     #End If
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+        If hThunk = 0 Then
+            Exit Function
+        End If
         Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
         aParams(2) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemAlloc")
         aParams(3) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemFree")
         Call DefSubclassProc(0, 0, 0, 0)                                            '--- load comctl32
-        aParams(4) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 410)      '--- 410 = SetWindowSubclass ordinal
-        aParams(5) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 412)      '--- 412 = RemoveWindowSubclass ordinal
-        aParams(6) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 413)      '--- 413 = DefSubclassProc ordinal
+        aParams(4) = GetProcByOrdinal(GetModuleHandle("comctl32"), 410)             '--- 410 = SetWindowSubclass ordinal
+        aParams(5) = GetProcByOrdinal(GetModuleHandle("comctl32"), 412)             '--- 412 = RemoveWindowSubclass ordinal
+        aParams(6) = GetProcByOrdinal(GetModuleHandle("comctl32"), 413)             '--- 413 = DefSubclassProc ordinal
         '--- for IDE protection
         Debug.Assert pvGetIdeOwner(aParams(7))
         If aParams(7) <> 0 Then
@@ -121,6 +127,9 @@ Public Function InitHookingThunk(ByVal idHook As Long, pObj As Object, ByVal pfn
     #End If
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+        If hThunk = 0 Then
+            Exit Function
+        End If
         Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
         aParams(2) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemAlloc")
         aParams(3) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemFree")
@@ -168,6 +177,9 @@ Public Function InitFireOnceTimerThunk(pObj As Object, ByVal pfnCallback As Long
     #End If
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+        If hThunk = 0 Then
+            Exit Function
+        End If
         Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
         aParams(2) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemAlloc")
         aParams(3) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemFree")
@@ -221,6 +233,9 @@ Public Function InitCleanupThunk(ByVal hHandle As Long, sModuleName As String, s
     #End If
     If hThunk = 0 Then
         hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+        If hThunk = 0 Then
+            Exit Function
+        End If
         Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
         aParams(0) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemAlloc")
         aParams(1) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemFree")
