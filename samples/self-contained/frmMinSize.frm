@@ -303,6 +303,12 @@ Private Sub Form_Load()
     m_sngMinHeight = Height
 End Sub
 
+Private Sub Form_Click()
+    With New frmWaitCompletion
+        .Show vbModal, Me
+    End With
+End Sub
+
 Private Sub ctxTrackMouse1_MouseEnter(Index As Integer)
     Debug.Print "ctxTrackMouse1_MouseEnter, Index=" & Index & ", IsHot=" & ctxTrackMouse1(Index).IsHot, Timer
 End Sub
