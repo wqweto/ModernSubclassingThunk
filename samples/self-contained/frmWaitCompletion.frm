@@ -78,12 +78,26 @@ Private m_sngStartTimer         As Single
 Private m_pTimer                As IUnknown
 
 '=========================================================================
-' API
+' Properties
 '=========================================================================
 
 Private Property Get pvAddressOfTimerProc() As frmWaitCompletion
     Set pvAddressOfTimerProc = InitAddressOfMethod(Me, 0)
 End Property
+
+'=========================================================================
+' Methods
+'=========================================================================
+
+Public Function TimerProc() As Long
+Attribute TimerProc.VB_MemberFlags = "40"
+    Caption = "Elapsed " & Round(Timer - m_sngStartTimer) & " sec"
+    Set m_pTimer = InitFireOnceTimerThunk(Me, pvAddressOfTimerProc.TimerProc(), Delay:=1000)
+End Function
+
+'=========================================================================
+' Control events
+'=========================================================================
 
 Private Sub cmdCancel_Click()
     Unload Me
@@ -93,12 +107,6 @@ Private Sub Form_Load()
     m_sngStartTimer = Timer
     Set m_pTimer = InitFireOnceTimerThunk(Me, pvAddressOfTimerProc.TimerProc(), Delay:=1000)
 End Sub
-
-Public Function TimerProc() As Long
-Attribute TimerProc.VB_MemberFlags = "40"
-    Caption = "Elapsed " & Round(Timer - m_sngStartTimer) & " sec"
-    Set m_pTimer = InitFireOnceTimerThunk(Me, pvAddressOfTimerProc.TimerProc(), Delay:=1000)
-End Function
 
 '=========================================================================
 ' The Modern Subclassing Thunk (MST)
