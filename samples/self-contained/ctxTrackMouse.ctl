@@ -35,7 +35,6 @@ Private Const WM_MOUSELEAVE                 As Long = &H2A3
 '--- for Modern Subclassing Thunk (MST)
 Private Const MEM_COMMIT                    As Long = &H1000
 Private Const PAGE_EXECUTE_READWRITE        As Long = &H40
-Private Const CRYPT_STRING_BASE64           As Long = 1
 Private Const SIGN_BIT                      As Long = &H80000000
 Private Const EBMODE_DESIGN                 As Long = 0
 '--- end MST
@@ -44,7 +43,6 @@ Private Declare Function TrackMouseEvent Lib "comctl32" Alias "_TrackMouseEvent"
 '--- for Modern Subclassing Thunk (MST)
 Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (Destination As Any, Source As Any, ByVal Length As Long)
 Private Declare Function VirtualAlloc Lib "kernel32" (ByVal lpAddress As Long, ByVal dwSize As Long, ByVal flAllocationType As Long, ByVal flProtect As Long) As Long
-Private Declare Function CryptStringToBinary Lib "crypt32" Alias "CryptStringToBinaryA" (ByVal pszString As String, ByVal cchString As Long, ByVal dwFlags As Long, ByVal pbBinary As Long, pcbBinary As Long, Optional ByVal pdwSkip As Long, Optional ByVal pdwFlags As Long) As Long
 Private Declare Function CallWindowProc Lib "user32" Alias "CallWindowProcA" (ByVal lpPrevWndFunc As Long, ByVal hWnd As Long, ByVal Msg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
 Private Declare Function GetModuleHandle Lib "kernel32" Alias "GetModuleHandleA" (ByVal lpModuleName As String) As Long
 Private Declare Function GetProcAddress Lib "kernel32" (ByVal hModule As Long, ByVal lpProcName As String) As Long
@@ -165,8 +163,10 @@ Private Function InitAddressOfMethod(pObj As Object, ByVal MethodParamCount As L
     Dim hThunk          As Long
     Dim lSize           As Long
     
-    hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
-    Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
+    hThunk = pvThunkAllocate(STR_THUNK, THUNK_SIZE)
+    If hThunk = 0 Then
+        Exit Function
+    End If
     lSize = CallWindowProc(hThunk, ObjPtr(pObj), MethodParamCount, GetProcAddress(GetModuleHandle("kernel32"), "VirtualFree"), VarPtr(InitAddressOfMethod))
     Debug.Assert lSize = THUNK_SIZE
 End Function
@@ -186,8 +186,10 @@ Private Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal 
         End If
     #End If
     If hThunk = 0 Then
-        hThunk = VirtualAlloc(0, THUNK_SIZE, MEM_COMMIT, PAGE_EXECUTE_READWRITE)
-        Call CryptStringToBinary(STR_THUNK, Len(STR_THUNK), CRYPT_STRING_BASE64, hThunk, THUNK_SIZE)
+        hThunk = pvThunkAllocate(STR_THUNK, THUNK_SIZE)
+        If hThunk = 0 Then
+            Exit Function
+        End If
         aParams(2) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemAlloc")
         aParams(3) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemFree")
         Call DefSubclassProc(0, 0, 0, 0)                                            '--- load comctl32
@@ -195,7 +197,7 @@ Private Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal 
         aParams(5) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 412)      '--- 412 = RemoveWindowSubclass ordinal
         aParams(6) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 413)      '--- 413 = DefSubclassProc ordinal
         '--- for IDE protection
-        Debug.Assert pvGetIdeOwner(aParams(7))
+        Debug.Assert pvThunkIdeOwner(aParams(7))
         If aParams(7) <> 0 Then
             aParams(8) = GetProcAddress(GetModuleHandle("user32"), "GetWindowLongA")
             aParams(9) = GetProcAddress(GetModuleHandle("vba6"), "EbMode")
@@ -218,7 +220,7 @@ Private Property Get ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index A
     End If
 End Property
 
-Private Function pvGetIdeOwner(hIdeOwner As Long) As Boolean
+Private Function pvThunkIdeOwner(hIdeOwner As Long) As Boolean
     #If Not ImplNoIdeProtection Then
         Dim lProcessId      As Long
         
@@ -227,7 +229,39 @@ Private Function pvGetIdeOwner(hIdeOwner As Long) As Boolean
             Call GetWindowThreadProcessId(hIdeOwner, lProcessId)
         Loop While hIdeOwner <> 0 And lProcessId <> GetCurrentProcessId()
     #End If
-    pvGetIdeOwner = True
+    pvThunkIdeOwner = True
+End Function
+
+Private Function pvThunkAllocate(sText As String, Optional ByVal Size As Long) As Long
+    Static Map(0 To &H3FF) As Long
+    Dim baInput()       As Byte
+    Dim lIdx            As Long
+    Dim lChar           As Long
+    Dim lPtr            As Long
+    
+    pvThunkAllocate = VirtualAlloc(0, IIf(Size > 0, Size, (Len(sText) \ 4) * 3), MEM_COMMIT, PAGE_EXECUTE_READWRITE)
+    If pvThunkAllocate = 0 Then
+        Exit Function
+    End If
+    '--- init decoding maps
+    If Map(65) = 0 Then
+        baInput = StrConv("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/", vbFromUnicode)
+        For lIdx = 0 To UBound(baInput)
+            lChar = baInput(lIdx)
+            Map(&H0 + lChar) = lIdx * (2 ^ 2)
+            Map(&H100 + lChar) = (lIdx And &H30) \ (2 ^ 4) Or (lIdx And &HF) * (2 ^ 12)
+            Map(&H200 + lChar) = (lIdx And &H3) * (2 ^ 22) Or (lIdx And &H3C) * (2 ^ 6)
+            Map(&H300 + lChar) = lIdx * (2 ^ 16)
+        Next
+    End If
+    '--- base64 decode loop
+    baInput = StrConv(Replace(Replace(sText, vbCr, vbNullString), vbLf, vbNullString), vbFromUnicode)
+    lPtr = pvThunkAllocate
+    For lIdx = 0 To UBound(baInput) - 3 Step 4
+        lChar = Map(baInput(lIdx + 0)) Or Map(&H100 + baInput(lIdx + 1)) Or Map(&H200 + baInput(lIdx + 2)) Or Map(&H300 + baInput(lIdx + 3))
+        Call CopyMemory(ByVal lPtr, lChar, 3)
+        lPtr = (lPtr Xor SIGN_BIT) + 3 Xor SIGN_BIT
+    Next
 End Function
 
 #If ImplSelfContained Then
