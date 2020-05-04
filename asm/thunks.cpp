@@ -10,10 +10,10 @@
 //=========================================================================
 
 //#define IMPL_ADDRESSOFMETHOD_THUNK
-//#define IMPL_SUBCLASSING_THUNK
+#define IMPL_SUBCLASSING_THUNK
 //#define IMPL_HOOKING_THUNK
 //#define IMPL_FIREONCETIMER_THUNK
-#define IMPL_CLEANUP_THUNK
+//#define IMPL_CLEANUP_THUNK
 
 #include <stdio.h>
 #include <windows.h>
@@ -437,6 +437,7 @@ __SubclassProc:
         push    ebp                             
         mov     ebp, esp
         mov     edx, dword ptr [ebp+24]         // this ptr = param uIdSubclass
+        inc     dword ptr [edx+m_dwRefCnt]      // __AddRef
         // if EbMode() > 1 goto __call_def_subclass
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         mov     eax, dword ptr [ecx+t_pfnEbMode]
@@ -491,13 +492,19 @@ __call_callback:
         test    ecx, ecx
         jnz     __exit_SubclassProc
 __call_def_subclass:
+        push    edx
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    dword ptr [ebp+20]              // param lParam
         push    dword ptr [ebp+16]              // param wParam
         push    dword ptr [ebp+12]              // param uMsg
         push    dword ptr [ebp+8]               // param hWnd
         call    dword ptr [ecx+t_pfnDefSubclassProc]
+        pop     edx
 __exit_SubclassProc:
+        push    eax
+        push    edx
+        call    __Release
+        pop     eax
         pop     ebp
         ret     24
         align   4
