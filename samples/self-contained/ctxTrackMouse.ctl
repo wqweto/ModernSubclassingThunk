@@ -36,6 +36,7 @@ Private Const WM_MOUSELEAVE                 As Long = &H2A3
 Private Const MEM_COMMIT                    As Long = &H1000
 Private Const PAGE_EXECUTE_READWRITE        As Long = &H40
 Private Const SIGN_BIT                      As Long = &H80000000
+Private Const PTR_SIZE                      As Long = 4
 Private Const EBMODE_DESIGN                 As Long = 0
 '--- end MST
 
@@ -46,7 +47,7 @@ Private Declare Function VirtualAlloc Lib "kernel32" (ByVal lpAddress As Long, B
 Private Declare Function CallWindowProc Lib "user32" Alias "CallWindowProcA" (ByVal lpPrevWndFunc As Long, ByVal hWnd As Long, ByVal Msg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
 Private Declare Function GetModuleHandle Lib "kernel32" Alias "GetModuleHandleA" (ByVal lpModuleName As String) As Long
 Private Declare Function GetProcAddress Lib "kernel32" (ByVal hModule As Long, ByVal lpProcName As String) As Long
-Private Declare Function GetProcAddressByOrdinal Lib "kernel32" Alias "GetProcAddress" (ByVal hModule As Long, ByVal lpProcOrdinal As Long) As Long
+Private Declare Function GetProcByOrdinal Lib "kernel32" Alias "GetProcAddress" (ByVal hModule As Long, ByVal lpProcOrdinal As Long) As Long
 Private Declare Function DefSubclassProc Lib "comctl32" Alias "#413" (ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
 Private Declare Function GetCurrentProcessId Lib "kernel32" () As Long
 #If Not ImplNoIdeProtection Then
@@ -103,7 +104,7 @@ Private Sub pvSubclass()
 End Sub
 
 Private Sub pvUnsubclass()
-    Set m_pSubclass = Nothing
+    TerminateSubclassingThunk m_pSubclass, Me
 End Sub
 
 Public Function SubclassProc(ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long, Handled As Boolean) As Long
@@ -172,8 +173,8 @@ Private Function InitAddressOfMethod(pObj As Object, ByVal MethodParamCount As L
 End Function
 
 Private Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal pfnCallback As Long) As IUnknown
-    Dim STR_THUNK       As String: STR_THUNK = "6AAAAABag+oFgepwEN8AV1aLdCQUg8YIgz4AdC+L+oHHEBLfAIvCBQgR3wCri8IFRBHfAKuLwgVUEd8Aq4vCBXwR3wCruQkAAADzpYHCEBLfAFJqGP9SEFqL+IvCq7gBAAAAqzPAq4tEJAyri3QkFKWlg+8YagBX/3IM/3cM/1IYi0QkGIk4Xl+4RBLfAC1wEN8AwhAAZpCLRCQIgzgAdSqDeAQAdSSBeAjAAAAAdRuBeAwAAABGdRKLVCQE/0IEi0QkDIkQM8DCDAC4AkAAgMIMAJCLVCQE/0IEi0IEwgQADx8Ai1QkBP9KBItCBHUYiwpS/3EM/3IM/1Eci1QkBIsKUv9RFDPAwgQAkFWL7ItVGP9CBIsKi0EshcB0OFL/0FqJQgiD+AF1VIP4AHUJgX0MAwIAAHRGiwpS/1EwWoXAdTuLClJq8P9xJP9RKFqpAAAACHUoUjPAUFCNRCQEUI1EJARQ/3UU/3UQ/3UM/3UI/3IQ/1IUWVhahcl1E1KLCv91FP91EP91DP91CP9RIFpQUuhM////WF3CGAAPHwA=" ' 4.5.2020 19:23:44
-    Const THUNK_SIZE    As Long = 468
+    Dim STR_THUNK       As String: STR_THUNK = "6AAAAABag+oFgepwEL4AV1aLdCQUg8YIgz4AdC+L+oHHFBK+AIvCBQgRvgCri8IFRBG+AKuLwgVUEb4Aq4vCBXwRvgCruQkAAADzpYHCFBK+AFJqGP9SEFqL+IvCq7gBAAAAqzPAq4tEJAyri3QkFKWlg+8YagBX/3IM/3cM/1IYi0QkGIk4Xl+4SBK+AC1wEL4AwhAAZpCLRCQIgzgAdSqDeAQAdSSBeAjAAAAAdRuBeAwAAABGdRKLVCQE/0IEi0QkDIkQM8DCDAC4AkAAgMIMAJCLVCQE/0IEi0IEwgQADx8Ai1QkBP9KBItCBHUYiwpS/3EM/3IM/1Eci1QkBIsKUv9RFDPAwgQAkFWL7ItVGP9CBItCEIXAdGiLCotBLIXAdDdS/9BaiUIIg/gBd1OFwHUJgX0MAwIAAHRGiwpS/1EwWoXAdTuLClJq8P9xJP9RKFqpAAAACHUoUjPAUFCNRCQEUI1EJARQ/3UU/3UQ/3UM/3UI/3IQ/1IUWVhahcl1E1KLCv91FP91EP91DP91CP9RIFpQUuhG////WF3CGACQ" ' 13.5.2020 17:56:48
+    Const THUNK_SIZE    As Long = 472
     Static hThunk       As Long
     Dim aParams(0 To 10) As Long
     Dim lSize           As Long
@@ -193,9 +194,9 @@ Private Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal 
         aParams(2) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemAlloc")
         aParams(3) = GetProcAddress(GetModuleHandle("ole32"), "CoTaskMemFree")
         Call DefSubclassProc(0, 0, 0, 0)                                            '--- load comctl32
-        aParams(4) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 410)      '--- 410 = SetWindowSubclass ordinal
-        aParams(5) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 412)      '--- 412 = RemoveWindowSubclass ordinal
-        aParams(6) = GetProcAddressByOrdinal(GetModuleHandle("comctl32"), 413)      '--- 413 = DefSubclassProc ordinal
+        aParams(4) = GetProcByOrdinal(GetModuleHandle("comctl32"), 410)             '--- 410 = SetWindowSubclass ordinal
+        aParams(5) = GetProcByOrdinal(GetModuleHandle("comctl32"), 412)             '--- 412 = RemoveWindowSubclass ordinal
+        aParams(6) = GetProcByOrdinal(GetModuleHandle("comctl32"), 413)             '--- 413 = DefSubclassProc ordinal
         '--- for IDE protection
         Debug.Assert pvThunkIdeOwner(aParams(7))
         If aParams(7) <> 0 Then
@@ -211,12 +212,29 @@ Private Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal 
     Debug.Assert lSize = THUNK_SIZE
 End Function
 
-Private Property Get ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index As Long) As Long
+Private Function TerminateSubclassingThunk(pSubclass As IUnknown, pObj As Object) As IUnknown
+    If Not pSubclass Is Nothing Then
+        Debug.Assert ThunkPrivateData(pSubclass, 2) = ObjPtr(pObj)
+        ThunkPrivateData(pSubclass, 2) = 0
+        Set pSubclass = Nothing
+    End If
+End Function
+
+Property Get ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index As Long) As Long
     Dim lPtr            As Long
     
     lPtr = ObjPtr(pThunk)
     If lPtr <> 0 Then
-        Call CopyMemory(ThunkPrivateData, ByVal (lPtr Xor SIGN_BIT) + 8 + Index * 4 Xor SIGN_BIT, 4)
+        Call CopyMemory(ThunkPrivateData, ByVal (lPtr Xor SIGN_BIT) + 8 + Index * 4 Xor SIGN_BIT, PTR_SIZE)
+    End If
+End Property
+
+Property Let ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index As Long, ByVal lValue As Long)
+    Dim lPtr            As Long
+    
+    lPtr = ObjPtr(pThunk)
+    If lPtr <> 0 Then
+        Call CopyMemory(ByVal (lPtr Xor SIGN_BIT) + 8 + Index * 4 Xor SIGN_BIT, lValue, PTR_SIZE)
     End If
 End Property
 

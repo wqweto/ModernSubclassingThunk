@@ -72,5 +72,5 @@ Private Sub Form_Load()
 End Sub
 
 Private Sub Form_Click()
-    Set m_pSubclass1 = Nothing
+    TerminateSubclassingThunk m_pSubclass1, Me
 End Sub

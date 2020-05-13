@@ -49,7 +49,7 @@ Private Declare Function GetCurrentProcessId Lib "kernel32" () As Long
 '=========================================================================
 
 Public Function InitAddressOfMethod(pObj As Object, ByVal MethodParamCount As Long) As Object
-    Const STR_THUNK     As String = "6AAAAABag+oFV4v6ge9QEMEAgcekEcEAuP9EJAS5+QcAAPOri8LB4AgFuQAAAKuLwsHoGAUAjYEAq7gIAAArq7hEJASLq7hJCIsEq7iBi1Qkq4tEJAzB4AIFCIkCM6uLRCQMweASBcDCCACriTrHQgQBAAAAi0QkCIsAiUIIi0QkEIlCDIHqUBDBAIvCBTwRwQCri8IFUBHBAKuLwgVgEcEAq4vCBYQRwQCri8IFjBHBAKuLwgWUEcEAq4vCBZwRwQCri8IFpBHBALn5BwAAq4PABOL6i8dfgcJQEMEAi0wkEIkRK8LCEAAPHwCLVCQE/0IEi0QkDIkQM8DCDABmkItUJAT/QgSLQgTCBAAPHwCLVCQE/0oEi0IEg/gAfgPCBABZWotCDGgAgAAAagBSUf/gZpC4AUAAgMIIALgBQACAwhAAuAFAAIDCGAC4AUAAgMIkAA==" ' 25.3.2019 14:01:08
+    Dim STR_THUNK       As String: STR_THUNK = "6AAAAABag+oFV4v6ge9QEMEAgcekEcEAuP9EJAS5+QcAAPOri8LB4AgFuQAAAKuLwsHoGAUAjYEAq7gIAAArq7hEJASLq7hJCIsEq7iBi1Qkq4tEJAzB4AIFCIkCM6uLRCQMweASBcDCCACriTrHQgQBAAAAi0QkCIsAiUIIi0QkEIlCDIHqUBDBAIvCBTwRwQCri8IFUBHBAKuLwgVgEcEAq4vCBYQRwQCri8IFjBHBAKuLwgWUEcEAq4vCBZwRwQCri8IFpBHBALn5BwAAq4PABOL6i8dfgcJQEMEAi0wkEIkRK8LCEAAPHwCLVCQE/0IEi0QkDIkQM8DCDABmkItUJAT/QgSLQgTCBAAPHwCLVCQE/0oEi0IEg/gAfgPCBABZWotCDGgAgAAAagBSUf/gZpC4AUAAgMIIALgBQACAwhAAuAFAAIDCGAC4AUAAgMIkAA==" ' 25.3.2019 14:01:08
     Const THUNK_SIZE    As Long = 16728
     Dim hThunk          As Long
     Dim lSize           As Long
@@ -63,8 +63,8 @@ Public Function InitAddressOfMethod(pObj As Object, ByVal MethodParamCount As Lo
 End Function
 
 Public Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal pfnCallback As Long) As IUnknown
-    Const STR_THUNK     As String = "6AAAAABag+oFgepwEN8AV1aLdCQUg8YIgz4AdC+L+oHHEBLfAIvCBQgR3wCri8IFRBHfAKuLwgVUEd8Aq4vCBXwR3wCruQkAAADzpYHCEBLfAFJqGP9SEFqL+IvCq7gBAAAAqzPAq4tEJAyri3QkFKWlg+8YagBX/3IM/3cM/1IYi0QkGIk4Xl+4RBLfAC1wEN8AwhAAZpCLRCQIgzgAdSqDeAQAdSSBeAjAAAAAdRuBeAwAAABGdRKLVCQE/0IEi0QkDIkQM8DCDAC4AkAAgMIMAJCLVCQE/0IEi0IEwgQADx8Ai1QkBP9KBItCBHUYiwpS/3EM/3IM/1Eci1QkBIsKUv9RFDPAwgQAkFWL7ItVGP9CBIsKi0EshcB0OFL/0FqJQgiD+AF1VIP4AHUJgX0MAwIAAHRGiwpS/1EwWoXAdTuLClJq8P9xJP9RKFqpAAAACHUoUjPAUFCNRCQEUI1EJARQ/3UU/3UQ/3UM/3UI/3IQ/1IUWVhahcl1E1KLCv91FP91EP91DP91CP9RIFpQUuhM////WF3CGAAPHwA=" ' 4.5.2020 19:23:44
-    Const THUNK_SIZE    As Long = 468
+    Dim STR_THUNK       As String: STR_THUNK = "6AAAAABag+oFgepwEL4AV1aLdCQUg8YIgz4AdC+L+oHHFBK+AIvCBQgRvgCri8IFRBG+AKuLwgVUEb4Aq4vCBXwRvgCruQkAAADzpYHCFBK+AFJqGP9SEFqL+IvCq7gBAAAAqzPAq4tEJAyri3QkFKWlg+8YagBX/3IM/3cM/1IYi0QkGIk4Xl+4SBK+AC1wEL4AwhAAZpCLRCQIgzgAdSqDeAQAdSSBeAjAAAAAdRuBeAwAAABGdRKLVCQE/0IEi0QkDIkQM8DCDAC4AkAAgMIMAJCLVCQE/0IEi0IEwgQADx8Ai1QkBP9KBItCBHUYiwpS/3EM/3IM/1Eci1QkBIsKUv9RFDPAwgQAkFWL7ItVGP9CBItCEIXAdGiLCotBLIXAdDdS/9BaiUIIg/gBd1OFwHUJgX0MAwIAAHRGiwpS/1EwWoXAdTuLClJq8P9xJP9RKFqpAAAACHUoUjPAUFCNRCQEUI1EJARQ/3UU/3UQ/3UM/3UI/3IQ/1IUWVhahcl1E1KLCv91FP91EP91DP91CP9RIFpQUuhG////WF3CGACQ" ' 13.5.2020 17:56:48
+    Const THUNK_SIZE    As Long = 472
     Static hThunk       As Long
     Dim aParams(0 To 10) As Long
     Dim lSize           As Long
@@ -102,6 +102,14 @@ Public Function InitSubclassingThunk(ByVal hWnd As Long, pObj As Object, ByVal p
     Debug.Assert lSize = THUNK_SIZE
 End Function
 
+Public Function TerminateSubclassingThunk(pSubclass As IUnknown, pObj As Object) As IUnknown
+    If Not pSubclass Is Nothing Then
+        Debug.Assert ThunkPrivateData(pSubclass, 2) = ObjPtr(pObj)
+        ThunkPrivateData(pSubclass, 2) = 0
+        Set pSubclass = Nothing
+    End If
+End Function
+
 Public Function CallNextSubclassProc(pSubclass As IUnknown, ByVal hWnd As Long, ByVal wMsg As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
     #If pSubclass Then '--- touch args
     #End If
@@ -109,8 +117,8 @@ Public Function CallNextSubclassProc(pSubclass As IUnknown, ByVal hWnd As Long, 
 End Function
 
 Public Function InitHookingThunk(ByVal idHook As Long, pObj As Object, ByVal pfnCallback As Long) As IUnknown
-    Dim STR_THUNK       As String: STR_THUNK = "6AAAAABag+oFgepwECQAV1aLdCQUg8YIgz4AdCqL+oHHOBIkAIvCBVQRJACri8IFkBEkAKuLwgWgESQAqzPAq7kJAAAA86WBwjgSJABSahj/UhBai/iLwqu4AQAAAKszwKuri3QkFKWlg+8Yi0oM/0IMgWIM/wAAAI0Eyo0EyI1MiDTHAf80JLiJeQTHQQiJRCQEi8ItOBIkAAXEESQAUMHgCAW4AAAAiUEMWMHoGAUA/+CQiUEQ/3QkEGoAUf90JBiLD/9RGIlHDItEJBiJOF5fuGwSJAAtcBAkAAUAFAAAwhAAi0QkCIM4AHUqg3gEAHUkgXgIwAAAAHUbgXgMAAAARnUSi1QkBP9CBItEJAyJEDPAwgwAuAJAAIDCDACQi1QkBP9CBItCBMIEAA8fAItUJAT/SgSLQgR1FIsK/3IM/1Eci1QkBIsKUv9RFDPAwgQAkFWL7ItVCIsKi0EshcB0KlL/0FqJQgiD+AF3Q4sKUv9RMFqFwHU4iwpSavD/cST/UShaqQAAAAh1JVIzwFBQjUQkBFCNRCQEUP91FP91EP91DP9yEP9SFFlYWoXJdRGLCv91FP91EP91DP9yDP9RIF3CEACQ" ' 1.4.2019 11:43:54
-    Const THUNK_SIZE    As Long = 5628
+    Dim STR_THUNK       As String: STR_THUNK = "6AAAAABag+oFgepwEN4AV1aLdCQUg8YIgz4AdCqL+oHHTBLeAIvCBVQR3gCri8IFkBHeAKuLwgWgEd4AqzPAq7kJAAAA86WBwkwS3gBSahj/UhBai/iLwqu4AQAAAKszwKuri3QkFKWlg+8Yi0oM/0IMgWIM/wAAAI0Eyo0EyI1MiDTHAf80JLiJeQTHQQiJRCQEi8ItTBLeAAXEEd4AUMHgCAW4AAAAiUEMWMHoGAUA/+CQiUEQ/3QkEGoAUf90JBiLD/9RGIlHDItEJBiJOF5fuIAS3gAtcBDeAAUAFAAAwhAAi0QkCIM4AHUqg3gEAHUkgXgIwAAAAHUbgXgMAAAARnUSi1QkBP9CBItEJAyJEDPAwgwAuAJAAIDCDACQi1QkBP9CBItCBMIEAA8fAItUJAT/SgSLQgR1FIsK/3IM/1Eci1QkBIsKUv9RFDPAwgQAkFWL7ItVCP9CBItCEIXAdFiLCotBLIXAdCpS/9BaiUIIg/gBd0OLClL/UTBahcB1OIsKUmrw/3Ek/1EoWqkAAAAIdSVSM8BQUI1EJARQjUQkBFD/dRT/dRD/dQz/chD/UhRZWFqFyXUTUosK/3UU/3UQ/3UM/3IM/1EgWlBS6Fr///9YXcIQAJA=" ' 13.5.2020 18:24:28
+    Const THUNK_SIZE    As Long = 5648
     Static hThunk       As Long
     Dim aParams(0 To 10) As Long
     Dim lSize           As Long
@@ -147,6 +155,14 @@ Public Function InitHookingThunk(ByVal idHook As Long, pObj As Object, ByVal pfn
     Debug.Assert lSize = THUNK_SIZE
 End Function
 
+Public Function TerminateHookingThunk(pHook As IUnknown, pObj As Object) As IUnknown
+    If Not pHook Is Nothing Then
+        Debug.Assert ThunkPrivateData(pHook, 2) = ObjPtr(pObj)
+        ThunkPrivateData(pHook, 2) = 0
+        Set pHook = Nothing
+    End If
+End Function
+
 Public Function CallNextHookProc(pHook As IUnknown, ByVal nCode As Long, ByVal wParam As Long, ByVal lParam As Long) As Long
     Dim lPtr            As Long
     
@@ -158,8 +174,8 @@ Public Function CallNextHookProc(pHook As IUnknown, ByVal nCode As Long, ByVal w
 End Function
 
 Public Function InitFireOnceTimerThunk(pObj As Object, ByVal pfnCallback As Long, Optional Delay As Long) As IUnknown
-    Dim STR_THUNK       As String: STR_THUNK = "6AAAAABag+oFgeogERkAV1aLdCQUg8YIgz4AdCqL+oHHBBMZAIvCBSgSGQCri8IFZBIZAKuLwgV0EhkAqzPAq7kIAAAA86WBwgQTGQBSahj/UhBai/iLwqu4AQAAAKszwKuri3QkFKWlg+8Yi0IMSCX/AAAAUItKDDsMJHULWIsPV/9RFDP/62P/QgyBYgz/AAAAjQTKjQTIjUyIMIB5EwB101jHAf80JLiJeQTHQQiJRCQEi8ItBBMZAAWgEhkAUMHgCAW4AAAAiUEMWMHoGAUA/+CQiUEQiU8MUf90JBRqAGoAiw//URiJRwiLRCQYiTheX7g0ExkALSARGQAFABQAAMIQAGaQi0QkCIM4AHUqg3gEAHUkgXgIwAAAAHUbgXgMAAAARnUSi1QkBP9CBItEJAyJEDPAwgwAuAJAAIDCDACQi1QkBP9CBItCBMIEAA8fAItUJAT/SgSLQgR1HYtCDMZAEwCLCv9yCGoA/1Eci1QkBIsKUv9RFDPAwgQAi1QkBIsKi0EohcB0J1L/0FqD+AF3SYsKUv9RLFqFwHU+iwpSavD/cSD/USRaqQAAAAh1K4sKUv9yCGoA/1EcWv9CBDPAUFT/chD/UhSLVCQIx0IIAAAAAFLodv///1jCFABmkA==" ' 27.3.2019 9:14:57
-    Const THUNK_SIZE    As Long = 5652
+    Dim STR_THUNK       As String: STR_THUNK = "6AAAAABag+oFgeogEQUAV1aLdCQUg8YIgz4AdCqL+oHHDBMFAIvCBSgSBQCri8IFZBIFAKuLwgV0EgUAqzPAq7kIAAAA86WBwgwTBQBSahj/UhBai/iLwqu4AQAAAKszwKuri3QkFKWlg+8Yi0IMSCX/AAAAUItKDDsMJHULWIsPV/9RFDP/62P/QgyBYgz/AAAAjQTKjQTIjUyIMIB5EwB101jHAf80JLiJeQTHQQiJRCQEi8ItDBMFAAWgEgUAUMHgCAW4AAAAiUEMWMHoGAUA/+CQiUEQiU8MUf90JBRqAGoAiw//URiJRwiLRCQYiTheX7g8EwUALSARBQAFABQAAMIQAGaQi0QkCIM4AHUqg3gEAHUkgXgIwAAAAHUbgXgMAAAARnUSi1QkBP9CBItEJAyJEDPAwgwAuAJAAIDCDACQi1QkBP9CBItCBMIEAA8fAItUJAT/SgSLQgR1HYtCDMZAEwCLCv9yCGoA/1Eci1QkBIsKUv9RFDPAwgQAi1QkBItCEIXAdFuLCotBKIXAdCdS/9Bag/gBd0mLClL/USxahcB1PosKUmrw/3Eg/1EkWqkAAAAIdSuLClL/cghqAP9RHFr/QgQzwFBU/3IQ/1IUi1QkCMdCCAAAAABS6G////9YwhQADx8AjURAAQ==" ' 13.5.2020 18:59:12
+    Const THUNK_SIZE    As Long = 5660
     Static hThunk       As Long
     Dim aParams(0 To 9) As Long
     Dim lSize           As Long
@@ -195,7 +211,15 @@ Public Function InitFireOnceTimerThunk(pObj As Object, ByVal pfnCallback As Long
     Debug.Assert lSize = THUNK_SIZE
 End Function
 
-Property Get ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index As Long) As Long
+Public Function TerminateFireOnceTimerThunk(pTimer As IUnknown, pObj As Object) As IUnknown
+    If Not pTimer Is Nothing Then
+        Debug.Assert ThunkPrivateData(pTimer, 2) = ObjPtr(pObj)
+        ThunkPrivateData(pTimer, 2) = 0
+        Set pTimer = Nothing
+    End If
+End Function
+
+Public Property Get ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index As Long) As Long
     Dim lPtr            As Long
     
     lPtr = ObjPtr(pThunk)
@@ -204,7 +228,7 @@ Property Get ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index As Long) 
     End If
 End Property
 
-Property Let ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index As Long, ByVal lValue As Long)
+Public Property Let ThunkPrivateData(pThunk As IUnknown, Optional ByVal Index As Long, ByVal lValue As Long)
     Dim lPtr            As Long
     
     lPtr = ObjPtr(pThunk)

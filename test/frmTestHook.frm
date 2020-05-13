@@ -45,7 +45,7 @@ Private Property Get pvAddressOfSubclassProc() As frmTestHook
 End Property
 
 Private Sub Form_Click()
-    Set m_pHook = Nothing
+    TerminateHookingThunk m_pHook, Me
 End Sub
 
 Private Sub Form_Load()

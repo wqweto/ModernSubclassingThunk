@@ -51,7 +51,7 @@ Public Function TimerProc() As Long
 Attribute TimerProc.VB_MemberFlags = "40"
     Debug.Print "TimerProc, App.NonModalAllowed=" & App.NonModalAllowed, Timer
 '    Set m_pTimer = InitFireOnceTimerThunk(Me, pvAddressOfTimerProc.TimerProc(), Delay:=100)
-    Set m_pTimer = Nothing
+    TerminateFireOnceTimerThunk m_pTimer, Me
 End Function
 
 Private Sub Timer1_Timer()
