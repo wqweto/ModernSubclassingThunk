@@ -14,7 +14,8 @@
 //#define IMPL_HOOKING_THUNK
 //#define IMPL_FIREONCETIMER_THUNK
 //#define IMPL_CLEANUP_THUNK
-#define IMPL_ASYNCSELECTNOTIFY_THUNK
+//#define IMPL_ASYNCSELECTNOTIFY_THUNK
+#define IMPL_RELEASE_THUNK
 
 #include <stdio.h>
 #include <windows.h>
@@ -421,7 +422,7 @@ __Release:
         jnz     __exit_Release
         
         // invoke RemoveWindowSubclass(this->hWnd, __SubclassProc, this)
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         push    edx                             // this ptr (for uIdSubclass)
         push    dword ptr [ecx+t_pfnSubclassProc] // __SubclassProc (for pfnSubclass)
         push    dword ptr [edx+m_hWnd]          // this->hWnd (for hWnd)
@@ -429,7 +430,7 @@ __Release:
         
         // invoke CoTaskMemFree(this)
         mov     edx, dword ptr [esp+4]          // edx = param this
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         push    edx
         call    dword ptr [ecx+t_pfnCoTaskMemFree] // vtbl->pfnCoTaskMemFree
         xor     eax, eax
@@ -442,8 +443,12 @@ __SubclassProc:
         mov     ebp, esp
         mov     edx, dword ptr [ebp+24]         // this ptr = param uIdSubclass
         inc     dword ptr [edx+m_dwRefCnt]      // __AddRef
+        // if this->m_pCallbackThis == 0 goto __call_def_subclass
+        mov     eax, dword ptr [edx+m_pCallbackThis]
+        test    eax, eax
+        jz      __call_def_subclass
         // if EbMode() > 1 goto __call_def_subclass
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         mov     eax, dword ptr [ecx+t_pfnEbMode]
         test    eax, eax
         jz      __call_callback
@@ -454,20 +459,20 @@ __SubclassProc:
         cmp     eax, 1
         ja      __call_def_subclass
         // if EbMode() == 0 And wMsg == WM_LBUTTONDBLCLK goto __call_def_subclass
-        cmp     eax, 0
-        jne     __not_design_time
+        test    eax, eax
+        jnz     __not_design_time
         cmp     dword ptr [ebp+12], WM_LBUTTONDBLCLK
         je      __call_def_subclass
 __not_design_time:
         // if EbIsResetting() goto __call_def_subclass
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         push    edx
         call    dword ptr [ecx+t_pfnEbIsResetting]
         pop     edx                             // restore this ptr
         test    eax, eax
         jnz     __call_def_subclass
         // invoke GetWindowLong(this->hIdeOwner, GWL_STYLE)
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         push    edx
         push    GWL_STYLE
         push    dword ptr [ecx+t_hIdeOwner]
@@ -497,7 +502,7 @@ __call_callback:
         jnz     __exit_SubclassProc
 __call_def_subclass:
         push    edx
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         push    dword ptr [ebp+20]              // param lParam
         push    dword ptr [ebp+16]              // param wParam
         push    dword ptr [ebp+12]              // param uMsg
@@ -669,7 +674,7 @@ __skip_init_thunk_data:
         push    edx
         push    sizeof_InstanceData
         call    dword ptr [edx+t_pfnCoTaskMemAlloc]
-        pop     edx
+        pop     edx                             // restore this ptr
         mov     edi, eax                        // edi = this ptr
 
         // init instance members
@@ -762,13 +767,13 @@ __Release:
         jnz     __exit_Release
         
         // invoke UnhookWindowsHookEx(this->hHook)
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         push    dword ptr [edx+m_hHook]         // this->hHook (for hhk)
         call    dword ptr [ecx+t_pfnUnhookWindowsHookEx]
         
         // invoke CoTaskMemFree(this)
         mov     edx, dword ptr [esp+4]          // param this
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         push    edx
         call    dword ptr [ecx+t_pfnCoTaskMemFree]
         xor     eax, eax
@@ -780,31 +785,36 @@ __HookProc:
         push    ebp
         mov     ebp, esp
         mov     edx, dword ptr [ebp+8]          // this ptr
+        inc     dword ptr [edx+m_dwRefCnt]      // __AddRef
+        // if this->m_pCallbackThis == 0 goto __call_next_hook
+        mov     eax, dword ptr [edx+m_pCallbackThis]
+        test    eax, eax
+        jz      __call_next_hook
         // if EbMode() > 1 goto __call_next_hook
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         mov     eax, dword ptr [ecx+t_pfnEbMode]
         test    eax, eax
         jz      __call_callback
         push    edx
         call    eax                             // this->pfnEbMode
-        pop     edx
+        pop     edx                             // restore this ptr
         mov     dword ptr [edx+m_dwEbMode], eax // save result
         cmp     eax, 1                          // 1 = running
         ja      __call_next_hook
         // if EbIsResetting() goto __call_next_hook
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         push    edx
         call    dword ptr [ecx+t_pfnEbIsResetting]
         pop     edx                             // restore this ptr
         test    eax, eax
         jnz      __call_next_hook
         // invoke GetWindowLong(this->hIdeOwner, GWL_STYLE)
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         push    edx
         push    GWL_STYLE
         push    dword ptr [ecx+t_hIdeOwner]
         call    dword ptr [ecx+t_pfnGetWindowLong]
-        pop     edx
+        pop     edx                             // restore this ptr
         test    eax, WS_DISABLED
         jnz     __call_next_hook
 __call_callback:
@@ -823,18 +833,24 @@ __call_callback:
         call    dword ptr [edx+m_pfnCallback]
         pop     ecx                             // Handled
         pop     eax                             // RetVal
-        pop     edx
+        pop     edx                             // restore this ptr
         test    ecx, ecx
         jnz     __exit_HookProc
 __call_next_hook:
         // invoke CallNextHookEx(hHook, nCode, wParam, lParam)
-        mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
+        push    edx
+        mov     ecx, dword ptr [edx+m_pVtbl]    // ecx = this->pVtbl
         push    dword ptr [ebp+20]              // param lParam
         push    dword ptr [ebp+16]              // param wParam
         push    dword ptr [ebp+12]              // param nCode
         push    dword ptr [edx+m_hHook]
         call    dword ptr [ecx+t_pfnCallNextHookEx]
+        pop     edx                             // restore this ptr
 __exit_HookProc:
+        push    eax
+        push    edx
+        call    __Release
+        pop     eax
         pop     ebp
         ret     16
         align   4
@@ -1137,6 +1153,10 @@ __exit_Release:
         align   4
 __TimerProc:
         mov     edx, dword ptr [esp+4]          // this ptr
+        // if this->m_pCallbackThis == 0 goto __call_next_hook
+        mov     eax, dword ptr [edx+m_pCallbackThis]
+        test    eax, eax
+        jz      __skip_callback
         // if EbMode() > 1 goto __skip_callback
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         mov     eax, dword ptr [ecx+t_pfnEbMode]
@@ -1233,10 +1253,6 @@ void main()
     IUnknown *pUnk = 0;
     DWORD dwSize = CallWindowProc((WNDPROC)hThunk, 0, 0xABC, (WPARAM)&p, (LPARAM)&pUnk);
     printf("dwSize=%d\nsizeof_InstanceData=%d\n", dwSize, sizeof_InstanceData);
-    dwSize -= countof_PushParamThunk * sizeof_PushParamThunk;
-    printf("offset __PushParamThunk=%d\n", dwSize);
-    dwSize -= sizeof_ThunkData;
-    printf("offset __vtable=%d\n", dwSize);
     MSG uMsg;
     while (GetMessage(&uMsg, 0, 0, 0) != 0) {
         TranslateMessage(&uMsg);
@@ -1251,7 +1267,7 @@ void main()
     printf("pUnk->Release=%d\n", pUnk->Release());
     WCHAR szBuffer[1000];
     DWORD dwBufSize = _countof(szBuffer);
-    CryptBinaryToString((BYTE *)FireOnceTimerThunk, dwSize, CRYPT_STRING_BASE64, szBuffer, &dwBufSize);
+    CryptBinaryToString((BYTE *)FireOnceTimerThunk, THUNK_SIZE - sizeof_ThunkData, CRYPT_STRING_BASE64, szBuffer, &dwBufSize);
     for(int i = 0, j = 0; (szBuffer[j] = szBuffer[i]) != 0; )
         ++i, j += (szBuffer[j] != '\r' && szBuffer[j] != '\n');
     printf("    Dim STR_THUNK       As String: STR_THUNK = \"%S\" ' %S\n", szBuffer, GetCurrentDateTime());
@@ -1809,7 +1825,6 @@ HRESULT __stdcall AsyncSelectNotifyProc(void *self, int table[], int table_size,
 
 void main()
 {
-    MSG msg;
     CoInitialize(0);
     LoadLibrary(L"comctl32");
     void *vtbl[] = { AsyncSelectNotifyProc };
@@ -1839,8 +1854,10 @@ void main()
     PostMessage(hWnd, WM_SETFOCUS, 0, 0);
     PostMessage(hWnd, WM_USER, 0, 0);
     g_dwEbMode = 1;
-    while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE)) {
-        DispatchMessage(&msg);
+    MSG uMsg;
+    while (GetMessage(&uMsg, 0, 0, 0) != 0) {
+        TranslateMessage(&uMsg);
+        DispatchMessage(&uMsg);
     }
     printf("pUnk->AddRef=%d\n", pUnk->AddRef());
     printf("pUnk->Release=%d\n", pUnk->Release());
@@ -1868,4 +1885,49 @@ HRESULT __stdcall AsyncSelectNotifyProc(void *self, int table[], int table_size,
     }
     return S_OK;
 }
+#endif
+
+
+#ifdef IMPL_RELEASE_THUNK
+enum InstanceData {
+    m_pVtbl = 0,
+    m_pIPAOReal = 4,
+};
+enum ThunkData {
+    t_pfnQI = 0,
+    t_pfnAddRef = 4,
+    t_pfnRelease = 8,
+};
+
+__declspec(naked, noinline)
+void __stdcall ReleaseThunk()
+{
+    __asm {
+__start:
+__Release:
+        mov     edx, dword ptr [esp+4]          // edx = param this
+        mov     eax, dword ptr [edx+m_pIPAOReal]
+        mov     ecx, dword ptr [eax+m_pVtbl]    // ecx = m_pIPAOReal->pVtbl
+        push    eax
+        call    dword ptr [ecx+t_pfnRelease]
+__exit_Release:
+        ret     4
+    }
+}
+
+#define THUNK_SIZE ((char *)main - (char *)ReleaseThunk)
+
+void main()
+{
+    CoInitialize(0);
+    LoadLibrary(L"comctl32");
+    WCHAR szBuffer[1000];
+    DWORD dwBufSize = _countof(szBuffer);
+    CryptBinaryToString((BYTE *)ReleaseThunk, THUNK_SIZE, CRYPT_STRING_BASE64, szBuffer, &dwBufSize);
+    for(int i = 0, j = 0; (szBuffer[j] = szBuffer[i]) != 0; )
+        ++i, j += (szBuffer[j] != '\r' && szBuffer[j] != '\n');
+    printf("    Dim STR_THUNK       As String: STR_THUNK = \"%S\" ' %S\n", szBuffer, GetCurrentDateTime());
+    printf("    Const THUNK_SIZE    As Long = %d\n", THUNK_SIZE);
+}
+
 #endif
