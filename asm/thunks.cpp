@@ -10,12 +10,12 @@
 //=========================================================================
 
 //#define IMPL_ADDRESSOFMETHOD_THUNK
-//#define IMPL_SUBCLASSING_THUNK
+#define IMPL_SUBCLASSING_THUNK
 //#define IMPL_HOOKING_THUNK
 //#define IMPL_FIREONCETIMER_THUNK
 //#define IMPL_CLEANUP_THUNK
 //#define IMPL_ASYNCSELECTNOTIFY_THUNK
-#define IMPL_RELEASE_THUNK
+//#define IMPL_RELEASE_THUNK
 
 #include <stdio.h>
 #include <windows.h>
@@ -292,7 +292,8 @@ enum InstanceData {
     m_hWnd = 12,
     m_pCallbackThis = 16,
     m_pfnCallback = 20,
-    sizeof_InstanceData = 24,
+    m_dwLocalCnt = 24,
+    sizeof_InstanceData = 28,
 };
 enum ThunkData {
     t_pfnQI = 0,
@@ -368,6 +369,8 @@ __skip_init_thunk_data:
         mov     esi, dword ptr [esp+20]         // param wParam
         movsd                                   // wParam->pCallbackThis
         movsd                                   // wParam->pfnCallback
+        xor     eax, eax
+        stosd                                   // this->dwLocalCnt
         sub     edi, sizeof_InstanceData        // rewind this ptr
 
         // invoke SetWindowSubclass(hWnd, __SubclassProc, this, 0)
@@ -443,6 +446,11 @@ __SubclassProc:
         mov     ebp, esp
         mov     edx, dword ptr [ebp+24]         // this ptr = param uIdSubclass
         inc     dword ptr [edx+m_dwRefCnt]      // __AddRef
+        inc     dword ptr [edx+m_dwLocalCnt]
+        // if this->dwLocalCnt == this->dwRefCnt goto __call_def_subclass
+        mov     eax, dword ptr [edx+m_dwLocalCnt]
+        cmp     eax, dword ptr [edx+m_dwRefCnt]
+        je      __call_def_subclass
         // if this->m_pCallbackThis == 0 goto __call_def_subclass
         mov     eax, dword ptr [edx+m_pCallbackThis]
         test    eax, eax
@@ -510,6 +518,7 @@ __call_def_subclass:
         call    dword ptr [ecx+t_pfnDefSubclassProc]
         pop     edx
 __exit_SubclassProc:
+        dec     dword ptr [edx+m_dwLocalCnt]
         push    eax
         push    edx
         call    __Release
@@ -1480,7 +1489,9 @@ enum InstanceData {
     m_pfnCallback = 24,
     m_dwStartIdx = 28,
     m_dwEndIdx = 32,
-    sizeof_InstanceData = 36,
+    m_fInCallback = 36,
+    m_dwLocalCnt = 40,
+    sizeof_InstanceData = 44,
     countof_Msg = 1024,
     sizeof_Msg = 12,
 };
@@ -1557,8 +1568,10 @@ __skip_init_thunk_data:
         movsd                                   // wParam->pCallbackThis
         movsd                                   // wParam->pfnCallback
         xor     eax, eax
-        stosd                                   // this->StartIdx
-        stosd                                   // this->EndIdx
+        stosd                                   // this->dwStartIdx
+        stosd                                   // this->dwEndIdx
+        stosd                                   // this->fInCallback
+        stosd                                   // this->dwLocalCnt
         sub     edi, sizeof_InstanceData        // rewind this ptr
         // invoke SetWindowSubclass(hWnd, __SubclassProc, this, 0)
         push    0                               // 0 (for dwRefData)
@@ -1633,7 +1646,8 @@ __SubclassProc:
         mov     ebp, esp
         mov     edx, dword ptr [ebp+24]         // this ptr = param uIdSubclass
         inc     dword ptr [edx+m_dwRefCnt]      // __AddRef
-__call_def_subclass:
+        inc     dword ptr [edx+m_dwLocalCnt]
+        // invoke DefSubclassProc(...)
         push    edx
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         push    dword ptr [ebp+20]              // param lParam
@@ -1644,6 +1658,12 @@ __call_def_subclass:
         pop     edx                             // restore this ptr
         push    eax                             // save DefSubclassProc result
         // save param uMsg, wParam and lParam in __MsgTable[this->EndIdx] slot
+        mov     eax, dword ptr [edx+m_dwEndIdx]
+        inc     eax
+        and     eax, countof_Msg - 1
+        cmp     eax, dword ptr [edx+m_dwStartIdx]
+        jz      __skip_save_MsgTable
+        push    eax                             // save next this->EndIdx
         push    esi
         push    edi
         lea     edi, dword ptr [edx+sizeof_InstanceData] // edi = addressof __MsgTable[this->EndIdx]
@@ -1656,8 +1676,12 @@ __call_def_subclass:
         movsd
         pop     edi
         pop     esi
-        inc     dword ptr [edx+m_dwEndIdx]
-        and     dword ptr [edx+m_dwEndIdx], countof_Msg - 1
+        pop     dword ptr [edx+m_dwEndIdx]      // restore next this->EndIdx
+__skip_save_MsgTable:
+        // if this->m_fInCallback <> 0 goto __exit_SubclassProc
+        mov     eax, dword ptr [edx+m_fInCallback]
+        test    eax, eax
+        jnz     __exit_SubclassProc
         // if this->m_dwTimerID <> 0 goto __exit_SubclassProc
         mov     eax, dword ptr [edx+m_dwTimerID]
         test    eax, eax
@@ -1690,6 +1714,15 @@ __call_def_subclass:
         test    eax, WS_DISABLED
         jnz     __start_callback_timer
 __call_callback_SubclassProc:
+        // if this->dwLocalCnt == this->dwRefCnt goto __exit_SubclassProc
+        mov     eax, dword ptr [edx+m_dwLocalCnt]
+        cmp     eax, dword ptr [edx+m_dwRefCnt]
+        je      __exit_SubclassProc
+        // if this->m_pCallbackThis == 0 goto __exit_SubclassProc
+        mov     eax, dword ptr [edx+m_pCallbackThis]
+        test    eax, eax
+        jz      __exit_SubclassProc
+        mov     dword ptr [edx+m_fInCallback], 1
         push    dword ptr [edx+m_dwEndIdx]
         // invoke this->m_pfnCallback(addressof __MsgTable, countof_Msg, this->StartIdx, this->EndIdx)
         push    edx
@@ -1705,13 +1738,11 @@ __call_callback_SubclassProc:
         call    dword ptr [edx+m_pfnCallback]
         pop     eax                             // ignore retval
         pop     edx                             // restore this ptr
+        mov     dword ptr [edx+m_fInCallback], 0
         pop     eax                             // assign this->m_StartIdx = this->EndIdx
         mov     dword ptr [edx+m_dwStartIdx], eax
         cmp     eax, dword ptr [edx+m_dwEndIdx]
         je      __exit_SubclassProc
-        mov     eax, dword ptr [edx+m_hWnd]
-        test    eax, eax
-        jz      __exit_SubclassProc
         jmp     __call_callback_SubclassProc
 __start_callback_timer:
         // this->dwTimerID = SetTimer(0, 0, 0, __TimerProc)
@@ -1725,6 +1756,7 @@ __start_callback_timer:
         pop     edx                             // restore this ptr
         mov     dword ptr [edx+m_dwTimerID], eax
 __exit_SubclassProc:
+        dec     dword ptr [edx+m_dwLocalCnt]
         push    edx
         call    __Release
         pop     eax                             // saved DefSubclassProc result
@@ -1739,6 +1771,7 @@ __next_timer:
         sub     edx, 5+offset __TimerProc
         add     edx, offset __InstanceData      // edx = this
         inc     dword ptr [edx+m_dwRefCnt]      // __AddRef
+        inc     dword ptr [edx+m_dwLocalCnt]
         // if EbMode() > 1 goto __exit_TimerProc
         mov     ecx, dword ptr [edx]            // ecx = this->pVtbl
         mov     eax, dword ptr [ecx+t_pfnEbMode]
@@ -1759,7 +1792,15 @@ __kill_timer:
         call    dword ptr [ecx+t_pfnKillTimer]
         pop     edx                             // restore this ptr
 __call_callback_TimerProc:
-        push    dword ptr [edx+m_dwEndIdx]
+        // if this->dwLocalCnt == this->dwRefCnt goto __clear_TimerID
+        mov     eax, dword ptr [edx+m_dwLocalCnt]
+        cmp     eax, dword ptr [edx+m_dwRefCnt]
+        je      __clear_TimerID
+        // if this->m_pCallbackThis == 0 goto __clear_TimerID
+        mov     eax, dword ptr [edx+m_pCallbackThis]
+        test    eax, eax
+        jz      __clear_TimerID
+        push    dword ptr [edx+m_dwEndIdx]      // save this->EndIdx
         // invoke this->m_pfnCallback(addressof __MsgTable, countof_Msg, this->StartIdx, this->EndIdx)
         push    edx
         xor     eax, eax                        // pRetVal
@@ -1774,17 +1815,14 @@ __call_callback_TimerProc:
         call    dword ptr [edx+m_pfnCallback]
         pop     eax                             // ignore retval
         pop     edx                             // restore this ptr
-        pop     eax                             // assign this->StartIdx = this->EndIdx
+        pop     eax                             // assign this->StartIdx = restore this->EndIdx
         mov     dword ptr [edx+m_dwStartIdx], eax 
         cmp     eax, dword ptr [edx+m_dwEndIdx]
-        je      __clear_TimerID
-        mov     eax, dword ptr [edx+m_hWnd]
-        test    eax, eax
-        jz      __clear_TimerID
-        jmp     __call_callback_TimerProc
+        jne     __call_callback_TimerProc
 __clear_TimerID:
         mov     dword ptr [edx+m_dwTimerID], 0  // note: clear this->TimerId *after* callback
 __exit_TimerProc:
+        dec     dword ptr [edx+m_dwLocalCnt]
         push    edx
         call    __Release
         ret     16
@@ -1815,6 +1853,8 @@ __InstanceData:
         lea     eax,[eax+eax*2+1]               // m_pfnCallback
         lea     eax,[eax+eax*2+1]               // m_dwStartIdx
         lea     eax,[eax+eax*2+1]               // m_dwEndIdx
+        lea     eax,[eax+eax*2+1]               // m_fInCallback
+        lea     eax,[eax+eax*2+1]               // m_dwLocalCnt
 __MsgTable:
     }
 }
@@ -1855,7 +1895,7 @@ void main()
     PostMessage(hWnd, WM_USER, 0, 0);
     g_dwEbMode = 1;
     MSG uMsg;
-    while (GetMessage(&uMsg, 0, 0, 0) != 0) {
+    while (PeekMessage(&uMsg, 0, 0, 0, PM_REMOVE) != 0) {
         TranslateMessage(&uMsg);
         DispatchMessage(&uMsg);
     }
